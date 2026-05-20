@@ -4,6 +4,11 @@ import path from 'path';
 
 export async function GET() {
   try {
+    // Em produção (Vercel), o WhatsApp roda separado
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ status: 'PRODUCTION_MODE', qr: null });
+    }
+    
     const stateFile = path.join(process.cwd(), 'whatsapp-state.json');
     
     if (!fs.existsSync(stateFile)) {
