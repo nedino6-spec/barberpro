@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Mantemos SQLite para desenvolvimento local, mas o Schema já reflete padrões do PostgreSQL
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          String    @default("BARBER") // ADMIN, MANAGER, BARBER, RECEPTIONIST
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  appointments  Appointment[] @relation("BarberAppointments")
+  commissions   Finance[]     @relation("BarberCommissions")
+  queueItems    QueueManager[] @relation("BarberQueue")
+}
+
+model Customer {
+  id            String    @id @default(uuid())
+  name          String
+  phone         String    @unique
+  preferences   String?
+  totalVisits   Int       @default(0)
+  lastVisit     DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  appointments  Appointment[]
+  loyalty       LoyaltySystem?
+  finance       CustomerFinance?
+  queueItem     QueueManager?
+}
+
+model Service {
+  id              String    @id @default(uuid())
+  name            String
+  description     String?
+  durationMinutes Int
+  price           Float
+  active          Boolean   @default(true)
+  pointsEarned    Int       @default(0) // Pontos que o cliente ganha ao fazer este serviço
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  appointments    Appointment[]
+}
+
+model Appointment {
+  id          String    @id @default(uuid())
+  date        DateTime
+  startTime   String
+  endTime     String
+  status      String    @default("PENDING") 
+  
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  
+  barberId    String
+  barber      User      @relation("BarberAppointments", fields: [barberId], references: [id])
+  
+  serviceId   String
+  service     Service   @relation(fields: [serviceId], references: [id])
+
+  finance     Finance?  
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Finance {
+  id               String    @id @default(uuid())
+  type             String    // INCOME, EXPENSE
+  amount           Float
+  description      String
+  date             DateTime
+  
+  appointmentId    String?   @unique
+  appointment      Appointment? @relation(fields: [appointmentId], references: [id])
+  
+  barberId         String?
+  barber           User?     @relation("BarberCommissions", fields: [barberId], references: [id])
+  barberCommission Float?
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Inventory {
+  id          String    @id @default(uuid())
+  productName String
+  quantity    Int
+  minQuantity Int
+  price       Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// -----------------------------------------
+// V2: FIDELIDADE, FINANCEIRO DO CLIENTE E FILA
+// -----------------------------------------
+
+model LoyaltySystem {
+  id             String    @id @default(uuid())
+  points         Int       @default(0)
+  vipLevel       String    @default("BRONZE") // BRONZE, SILVER, GOLD, BLACK
+  
+  customerId     String    @unique
+  customer       Customer  @relation(fields: [customerId], references: [id])
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model CustomerFinance {
+  id             String    @id @default(uuid())
+  availableBalance Float   @default(0) // Créditos ou Cashback
+  debtBalance    Float     @default(0) // Fiado/Devedor
+  
+  customerId     String    @unique
+  customer       Customer  @relation(fields: [customerId], references: [id])
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model QueueManager {
+  id             String    @id @default(uuid())
+  position       Int       @default(0)
+  status         String    @default("WAITING") // WAITING, IN_PROGRESS, COMPLETED
+  estimatedWaitMins Int    @default(0)
+  
+  customerId     String    @unique
+  customer       Customer  @relation(fields: [customerId], references: [id])
+  
+  barberId       String?
+  barber         User?     @relation("BarberQueue", fields: [barberId], references: [id])
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model MarketingCampaigns {
+  id             String    @id @default(uuid())
+  title          String
+  message        String
+  imageUrl       String?
+  status         String    @default("DRAFT") // DRAFT, SENDING, COMPLETED
+  sentCount      Int       @default(0)
+  targetAudience String    @default("ALL") // ALL, VIP, ABSENT_30_DAYS
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}

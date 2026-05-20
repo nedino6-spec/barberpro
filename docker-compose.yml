@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: barberpro-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: barberadmin
+      POSTGRES_PASSWORD: supersecretpassword
+      POSTGRES_DB: barberpro_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: barberpro-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  whatsapp-bot:
+    build:
+      context: .
+      dockerfile: whatsapp-service/Dockerfile
+    container_name: barberpro-whatsapp
+    restart: always
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./whatsapp-state.json:/app/whatsapp-state.json
+      - ./whatsapp-service/session:/app/session
+    depends_on:
+      - redis
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: barberpro-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://barberadmin:supersecretpassword@db:5432/barberpro_db?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    depends_on:
+      - db
+      - redis
+      - whatsapp-bot
+
+volumes:
+  postgres_data:
+  redis_data:
