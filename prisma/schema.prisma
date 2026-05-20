@@ -3,9 +3,9 @@ generator client {
 }
 
 datasource db {
-  // Mantemos SQLite para desenvolvimento local, mas o Schema já reflete padrões do PostgreSQL
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
