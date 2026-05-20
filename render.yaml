@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: barberpro-whatsapp-bot
+    env: docker
+    dockerfilePath: ./whatsapp-service/Dockerfile
+    plan: free
+    healthCheckPath: /
