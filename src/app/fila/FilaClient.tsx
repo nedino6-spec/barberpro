@@ -12,8 +12,9 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
   const [socketConnected, setSocketConnected] = useState(false);
 
   useEffect(() => {
-    // Conectar ao WebSocket rodando na porta 3001 (whatsapp-service)
-    socket = io("http://localhost:3001");
+    // Conectar ao WebSocket (usa a env no Vercel ou localhost local)
+    const wsUrl = process.env.NEXT_PUBLIC_WHATSAPP_API_URL || "http://localhost:3001";
+    socket = io(wsUrl);
 
     socket.on("connect", () => {
       setSocketConnected(true);

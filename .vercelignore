@@ -1,0 +1,9 @@
+node_modules
+.next
+whatsapp-service/session
+.wwebjs_cache
+whatsapp-state.json
+*.db
+*.db-journal
+dev.db
+.env

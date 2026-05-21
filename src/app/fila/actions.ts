@@ -27,7 +27,8 @@ export async function addToQueue(formData: FormData) {
 
   // Notificar via WebSocket
   try {
-    await fetch("http://localhost:3001/fila/update", {
+    const apiUrl = process.env.WHATSAPP_API_URL || "http://localhost:3001";
+    await fetch(`${apiUrl}/fila/update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newItem)
@@ -49,7 +50,8 @@ export async function completeQueueItem(id: string) {
   // ...
 
   try {
-    await fetch("http://localhost:3001/fila/update", {
+    const apiUrl = process.env.WHATSAPP_API_URL || "http://localhost:3001";
+    await fetch(`${apiUrl}/fila/update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "completed", id })
