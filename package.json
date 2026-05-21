@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
+    "bot": "node whatsapp-service/index.js",
+    "start:all": "concurrently \"npm run dev\" \"npm run bot\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -27,6 +29,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",

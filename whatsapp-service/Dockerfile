@@ -14,12 +14,8 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-# Como esse script roda dentro da pasta whatsapp-service, copiamos o package do app root se necessário,
-# mas para um microsserviço isolado, ele deveria ter o próprio package.json.
-# Como ele está puxando as libs do root, vamos copiar os node_modules ou instalar localmente.
-# Para evitar complicação, vamos copiar o package root e instalar
-COPY ../package.json ../package-lock.json ./
-RUN npm install whatsapp-web.js qrcode.react express cors
+COPY package.json ./
+RUN npm install
 
 # Copia os arquivos do serviço
 COPY . .
