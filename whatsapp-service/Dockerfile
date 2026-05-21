@@ -14,11 +14,12 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-COPY package.json ./
+# O Render usa a raiz do projeto como contexto do Docker
+COPY whatsapp-service/package.json ./
 RUN npm install
 
-# Copia os arquivos do serviço
-COPY . .
+# Copia apenas os arquivos do robô
+COPY whatsapp-service/ ./
 
 EXPOSE 3001
 
