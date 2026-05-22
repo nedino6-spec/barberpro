@@ -1,7 +1,12 @@
 services:
   - type: web
-    name: barberpro-whatsapp-bot
-    env: docker
-    dockerfilePath: ./whatsapp-service/Dockerfile
+    name: barberpro-bot
+    env: node
+    buildCommand: npm install
+    startCommand: npm run bot
     plan: free
-    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_hMDwC2i1ByeW@ep-spring-block-aqe6zzvj-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
