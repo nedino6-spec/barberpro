@@ -11,12 +11,20 @@ export async function GET() {
     // Se tivermos a URL do Koyeb ou do bot rodando separado, busca de lá
     if (botUrl) {
       try {
-        const res = await fetch(`${botUrl}/status`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s de limite
+
+        const res = await fetch(`${botUrl}/status`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (res.ok) {
           const data = await res.json();
           return NextResponse.json(data);
         }
-      } catch (e) {
+      } catch (e: any) {
+        if (e.name === 'AbortError') {
+           return NextResponse.json({ status: 'STARTING', qr: null });
+        }
         console.error("Erro ao buscar status do bot externo:", e);
       }
       return NextResponse.json({ status: 'OFFLINE', qr: null });

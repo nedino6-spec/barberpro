@@ -21,14 +21,26 @@ export default function AgendoZapSettings() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/whatsapp/status');
-        const data = await res.json();
-        setStatus(data.status);
-        if (data.qr) setQrCode(data.qr);
-        else setQrCode(null);
+        if (!res.ok) {
+          setStatus(res.status === 504 ? 'STARTING' : 'OFFLINE');
+          return;
+        }
+        
+        // Verifica se a resposta é JSON antes de tentar parsear
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const data = await res.json();
+          setStatus(data.status);
+          if (data.qr) setQrCode(data.qr);
+          else setQrCode(null);
+        } else {
+          setStatus('STARTING'); // Se for HTML de timeout da Vercel, está iniciando
+        }
       } catch (error) {
         console.error("Erro", error);
+        setStatus('OFFLINE');
       }
-    }, 3000);
+    }, 5000); // Aumentando o intervalo para 5 segundos para desafogar o servidor
     return () => clearInterval(interval);
   }, []);
 
