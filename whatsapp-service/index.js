@@ -27,7 +27,10 @@ updateState({ status: 'STARTING', qr: null });
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(__dirname, 'session') }),
-    puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+    puppeteer: { 
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    }
 });
 
 client.on('qr', (qr) => updateState({ status: 'AWAITING_QR', qr: qr }));
