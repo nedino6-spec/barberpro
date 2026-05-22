@@ -144,6 +144,7 @@ app.post('/fila/update', (req, res) => {
     res.json({ success: true });
 });
 
-server.listen(3001, () => {
-    console.log('API do WhatsApp e WebSocket rodando na porta 3001');
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`API do WhatsApp e WebSocket rodando na porta ${PORT}`);
 });
