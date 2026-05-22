@@ -8,7 +8,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const stateFile = path.join(__dirname, '..', 'whatsapp-state.json');
+const stateFile = process.env.STATE_FILE || path.join('/tmp', 'whatsapp-state.json');
 
 function updateState(newState) {
   let state = { status: 'DISCONNECTED', qr: null };
@@ -26,10 +26,10 @@ function updateState(newState) {
 updateState({ status: 'STARTING', qr: null });
 
 const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: path.join(__dirname, 'session') }),
+    authStrategy: new LocalAuth({ dataPath: process.env.SESSION_PATH || path.join('/tmp', 'wwebjs_auth') }),
     puppeteer: { 
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
     }
 });
 
