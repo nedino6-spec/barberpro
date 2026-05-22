@@ -1,27 +1,25 @@
 FROM node:20-slim
 
-# Instalar dependências necessárias para o Puppeteer (Chrome) rodar no Linux
-RUN apt-get update && apt-get install gnupg wget -y && \
-  wget --quiet --output-document=- https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/google-archive.gpg && \
-  sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' && \
-  apt-get update && \
-  apt-get install google-chrome-stable -y --no-install-recommends && \
-  rm -rf /var/lib/apt/lists/*
+# Instala o Google Chrome estável e dependências necessárias para o Puppeteer/WhatsApp
+RUN apt-get update \
+    && apt-get install -y wget gnupg ca-certificates \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+       fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-freefont-ttf \
+       libxss1 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libnss3 libxrandr2 libasound2 \
+       --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
-# Definir caminho do Chrome para o Puppeteer não baixar o Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 WORKDIR /app
-
-# O Render usa a raiz do projeto como contexto do Docker
-COPY whatsapp-service/package.json ./
+COPY package*.json ./
 RUN npm install
-
-# Copia apenas os arquivos do robô
-COPY whatsapp-service/ ./
+COPY . .
 
 EXPOSE 3001
 
-# O comando para iniciar
-CMD ["node", "index.js"]
+CMD ["node", "whatsapp-service/index.js"]
