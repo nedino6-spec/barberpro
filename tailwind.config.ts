@@ -9,35 +9,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--bg-primary)",
-        foreground: "var(--text-primary)",
+        background: "#0f172a",
+        foreground: "#f8fafc",
+        card: "#1e293b",
+        border: "rgba(255,255,255,0.1)",
         primary: {
-          DEFAULT: "var(--accent-primary)",
-          hover: "var(--accent-hover)",
-          light: "var(--accent-light)",
-        },
-        card: {
-          DEFAULT: "var(--bg-secondary)",
-          border: "var(--border-color)",
+          DEFAULT: "#3b82f6",
+          hover: "#2563eb",
+          light: "rgba(59, 130, 246, 0.15)",
         },
         muted: {
-          DEFAULT: "var(--text-muted)",
-          foreground: "var(--text-secondary)",
+          DEFAULT: "#64748b",
+          foreground: "#94a3b8",
         },
-        success: "var(--success)",
-        warning: "var(--warning)",
-        danger: "var(--danger)",
+        success: "#10b981",
+        warning: "#f59e0b",
+        danger: "#ef4444",
       },
       borderRadius: {
-        lg: "var(--radius-lg)",
-        md: "var(--radius-md)",
-        sm: "var(--radius-sm)",
+        "2xl": "1rem",
+        "3xl": "1.5rem",
       },
       boxShadow: {
-        glow: "var(--shadow-glow)",
-      }
+        glow: "0 0 15px rgba(59, 130, 246, 0.3)",
+      },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
     },
   },
   plugins: [],
 };
+
 export default config;
