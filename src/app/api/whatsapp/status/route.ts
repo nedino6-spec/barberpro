@@ -4,11 +4,23 @@ import path from 'path';
 
 export async function GET() {
   try {
-    // Em produção (Vercel), o WhatsApp roda separado
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ status: 'PRODUCTION_MODE', qr: null });
-    }
+    const botUrl = process.env.BOT_API_URL;
     
+    // Se tivermos a URL do Koyeb ou do bot rodando separado, busca de lá
+    if (botUrl) {
+      try {
+        const res = await fetch(`${botUrl}/status`);
+        if (res.ok) {
+          const data = await res.json();
+          return NextResponse.json(data);
+        }
+      } catch (e) {
+        console.error("Erro ao buscar status do bot externo:", e);
+      }
+      return NextResponse.json({ status: 'OFFLINE', qr: null });
+    }
+
+    // Fallback: Modo desenvolvimento local (lendo o arquivo json gerado pelo npm run bot)
     const stateFile = path.join(process.cwd(), 'whatsapp-state.json');
     
     if (!fs.existsSync(stateFile)) {

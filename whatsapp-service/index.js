@@ -105,6 +105,18 @@ app.post('/send', async (req, res) => {
     }
 });
 
+app.get('/status', (req, res) => {
+    try {
+        if (fs.existsSync(stateFile)) {
+            const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+            return res.json(state);
+        }
+        res.json({ status: 'OFFLINE', qr: null });
+    } catch (e) {
+        res.json({ status: 'ERROR', qr: null });
+    }
+});
+
 // Importações do Socket.io
 const http = require('http');
 const { Server } = require('socket.io');
