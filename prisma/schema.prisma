@@ -12,6 +12,12 @@ model Tenant {
   name      String
   domain    String?  @unique // Para subdomínios (white-label)
   isActive  Boolean  @default(true)
+  
+  // Queue Config
+  queueOpenTime   String   @default("09:00")
+  queueCloseTime  String   @default("18:00")
+  isQueuePaused   Boolean  @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   

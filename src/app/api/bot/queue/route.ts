@@ -11,6 +11,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Telefone é obrigatório" }, { status: 400 });
     }
 
+    // Verifica Configurações da Fila
+    const tenant = await prisma.tenant.findFirst();
+    if (tenant) {
+      if (tenant.isQueuePaused) {
+        return NextResponse.json({ error: "A fila virtual está pausada no momento. Tente novamente mais tarde." }, { status: 403 });
+      }
+      
+      const now = new Date();
+      const currentHour = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      if (currentHour < tenant.queueOpenTime || currentHour > tenant.queueCloseTime) {
+        return NextResponse.json({ error: `A fila virtual funciona apenas entre ${tenant.queueOpenTime} e ${tenant.queueCloseTime}.` }, { status: 403 });
+      }
+    }
+
     // Achar ou criar cliente
     let customer = await prisma.customer.findUnique({ where: { phone } });
     if (!customer) {

@@ -13,6 +13,22 @@ export async function addToQueue(formData: FormData) {
       else throw new Error("Crie um cliente primeiro na aba Clientes.");
   }
 
+  // Verifica Configurações da Fila
+  const tenant = await prisma.tenant.findFirst();
+  if (tenant) {
+    if (tenant.isQueuePaused) {
+      throw new Error("A fila virtual está pausada no momento. Tente novamente mais tarde.");
+    }
+    
+    // Verifica horário (Exemplo simplificado considerando horário local do servidor)
+    const now = new Date();
+    const currentHour = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    
+    if (currentHour < tenant.queueOpenTime || currentHour > tenant.queueCloseTime) {
+      throw new Error(`A fila virtual funciona apenas entre ${tenant.queueOpenTime} e ${tenant.queueCloseTime}.`);
+    }
+  }
+
   // Calcula tempo de espera (ex: 15 min por pessoa na frente)
   const peopleAhead = await prisma.queueManager.count({ where: { status: "WAITING" } });
   

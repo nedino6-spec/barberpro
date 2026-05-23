@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 export default function ConfiguracoesPage() {
-  const [activeTab, setActiveTab] = useState<"services" | "hours">("services");
+  const [activeTab, setActiveTab] = useState<"services" | "hours" | "queue">("services");
   
   // Services State
   const [services, setServices] = useState<any[]>([]);
@@ -20,9 +20,15 @@ export default function ConfiguracoesPage() {
   const [loadingHours, setLoadingHours] = useState(true);
   const [savingHours, setSavingHours] = useState(false);
 
+  // Queue State
+  const [queueConfig, setQueueConfig] = useState<any>({ queueOpenTime: "09:00", queueCloseTime: "18:00", isQueuePaused: false });
+  const [loadingQueue, setLoadingQueue] = useState(true);
+  const [savingQueue, setSavingQueue] = useState(false);
+
   useEffect(() => {
     fetchServices();
     fetchHours();
+    fetchQueueConfig();
   }, []);
 
   const fetchServices = async () => {
@@ -42,6 +48,16 @@ export default function ConfiguracoesPage() {
       setHours(await res.json());
     } finally {
       setLoadingHours(false);
+    }
+  };
+
+  const fetchQueueConfig = async () => {
+    setLoadingQueue(true);
+    try {
+      const res = await fetch("/api/config/queue");
+      setQueueConfig(await res.json());
+    } finally {
+      setLoadingQueue(false);
     }
   };
 
@@ -117,6 +133,23 @@ export default function ConfiguracoesPage() {
     }
   };
 
+  const handleSaveQueueConfig = async () => {
+    setSavingQueue(true);
+    try {
+      const res = await fetch("/api/config/queue", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(queueConfig)
+      });
+      if (res.ok) alert("Configurações da fila salvas com sucesso!");
+      else alert("Erro ao salvar fila");
+    } catch (e) {
+      alert("Erro de conexão");
+    } finally {
+      setSavingQueue(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div>
@@ -125,7 +158,7 @@ export default function ConfiguracoesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 p-1 bg-card border border-border rounded-xl w-full md:w-fit">
+      <div className="flex flex-wrap gap-2 p-1 bg-card border border-border rounded-xl w-full md:w-fit">
         <button 
           onClick={() => setActiveTab("services")}
           className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "services" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-bg-tertiary"}`}
@@ -137,6 +170,12 @@ export default function ConfiguracoesPage() {
           className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "hours" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-bg-tertiary"}`}
         >
           <Clock className="w-4 h-4" /> Horários
+        </button>
+        <button 
+          onClick={() => setActiveTab("queue")}
+          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "queue" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-bg-tertiary"}`}
+        >
+          <AlertCircle className="w-4 h-4" /> Fila Virtual
         </button>
       </div>
 
@@ -269,6 +308,80 @@ export default function ConfiguracoesPage() {
 
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===================== TAB FILA VIRTUAL ===================== */}
+        {activeTab === "queue" && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold">Controle da Fila Virtual</h2>
+              <button 
+                onClick={handleSaveQueueConfig}
+                disabled={savingQueue}
+                className="flex items-center gap-2 px-4 py-2 bg-success text-white rounded-xl text-sm font-medium hover:bg-success/90 shadow-glow transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" /> {savingQueue ? 'Salvando...' : 'Salvar Tudo'}
+              </button>
+            </div>
+
+            {loadingQueue ? (
+              <div className="text-center py-8 text-muted-foreground animate-pulse">Carregando configurações...</div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                
+                {/* Botão de Pânico (Pausar Fila) */}
+                <div className={`p-6 rounded-2xl border transition-colors flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${queueConfig.isQueuePaused ? 'bg-danger/10 border-danger/20' : 'bg-card border-border'}`}>
+                  <div>
+                    <h3 className={`text-lg font-bold ${queueConfig.isQueuePaused ? 'text-danger' : 'text-foreground'}`}>
+                      {queueConfig.isQueuePaused ? 'Fila Pausada (Interrompida)' : 'Fila Ativa (Funcionando)'}
+                    </h3>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      Quando pausada, nenhum cliente consegue entrar na fila pelo celular ou WhatsApp.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setQueueConfig({...queueConfig, isQueuePaused: !queueConfig.isQueuePaused})}
+                    className={`px-6 py-3 rounded-xl font-bold transition-all active:scale-95 ${queueConfig.isQueuePaused ? 'bg-success text-white shadow-glow' : 'bg-danger text-white shadow-glow'}`}
+                  >
+                    {queueConfig.isQueuePaused ? '▶ Retomar Fila Agora' : '⏸ Pausar Fila Agora'}
+                  </button>
+                </div>
+
+                {/* Horários Automáticos */}
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                  <h3 className="text-lg font-bold text-foreground mb-4">Horários Automáticos</h3>
+                  <p className="text-muted-foreground text-sm mb-6">
+                    A fila abrirá e fechará automaticamente todos os dias nestes horários fixos.
+                  </p>
+                  
+                  <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Abre às</label>
+                      <input 
+                        type="time" 
+                        value={queueConfig.queueOpenTime}
+                        onChange={(e) => setQueueConfig({...queueConfig, queueOpenTime: e.target.value})}
+                        className="bg-background border border-border rounded-xl px-4 py-2.5 outline-none focus:border-primary transition-colors font-medium text-lg" 
+                      />
+                    </div>
+                    
+                    <div className="hidden md:block w-8 h-px bg-border mt-6"></div>
+                    
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Fecha às</label>
+                      <input 
+                        type="time" 
+                        value={queueConfig.queueCloseTime}
+                        onChange={(e) => setQueueConfig({...queueConfig, queueCloseTime: e.target.value})}
+                        className="bg-background border border-border rounded-xl px-4 py-2.5 outline-none focus:border-danger transition-colors font-medium text-lg" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
