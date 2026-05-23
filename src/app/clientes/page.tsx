@@ -1,6 +1,7 @@
+import Link from "next/link";
 import CustomerModal from "@/components/CustomerModal";
 import { prisma } from "@/lib/prisma";
-import { Users, Search, Download, Filter, Phone, Star, ChevronRight } from "lucide-react";
+import { Users, Search, Download, Filter, Phone, Star, ChevronRight, Ban } from "lucide-react";
 
 export const revalidate = 0; 
 
@@ -54,17 +55,24 @@ export default async function ClientesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {customers.map((customer) => (
-              <div key={customer.id} className="bg-background border border-border rounded-xl p-5 hover:border-primary/50 transition-colors group cursor-pointer">
+              <Link href={`/clientes/${customer.id}`} key={customer.id} className={`bg-background border rounded-xl p-5 hover:border-primary/50 transition-colors group cursor-pointer block ${customer.isBlocked ? 'border-danger/30 bg-danger/5' : 'border-border'}`}>
                 <div className="flex justify-between items-start mb-3">
                   <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-lg font-bold">
                     {customer.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md text-success bg-success/10">
-                    <Star className="w-3 h-3 fill-current" /> {customer.totalVisits} visitas
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md text-success bg-success/10">
+                      <Star className="w-3 h-3 fill-current" /> {customer.totalVisits} visitas
+                    </span>
+                    {customer.isBlocked && (
+                      <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md text-danger bg-danger/10">
+                        <Ban className="w-3 h-3" /> Bloqueado
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
-                <h3 className="font-bold text-foreground text-lg truncate">{customer.name}</h3>
+                <h3 className={`font-bold text-lg truncate ${customer.isBlocked ? 'text-danger' : 'text-foreground'}`}>{customer.name}</h3>
                 
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-2 font-medium">
                   <Phone className="w-4 h-4" /> {customer.phone}
@@ -73,7 +81,7 @@ export default async function ClientesPage() {
                 <div className="mt-4 pt-4 border-t border-border flex items-center justify-between text-sm text-primary font-medium opacity-80 group-hover:opacity-100 transition-opacity">
                   Ver Perfil <ChevronRight className="w-4 h-4" />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

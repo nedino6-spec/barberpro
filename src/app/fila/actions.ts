@@ -32,6 +32,12 @@ export async function addToQueue(formData: FormData) {
   // Calcula tempo de espera (ex: 15 min por pessoa na frente)
   const peopleAhead = await prisma.queueManager.count({ where: { status: "WAITING" } });
   
+  // Verifica se o cliente está bloqueado
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  if (customer?.isBlocked) {
+    throw new Error("Este cliente está bloqueado e não pode entrar na fila.");
+  }
+  
   const newItem = await prisma.queueManager.create({
     data: {
       customerId,

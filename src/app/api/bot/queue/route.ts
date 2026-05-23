@@ -36,6 +36,11 @@ export async function POST(request: Request) {
       });
     }
 
+    // Verifica bloqueio do cliente
+    if (customer.isBlocked) {
+      return NextResponse.json({ error: "Seu acesso está bloqueado. Por favor, entre em contato com a barbearia." }, { status: 403 });
+    }
+
     // Verificar se já tá na fila
     const existingQueue = await prisma.queueManager.findUnique({
       where: { customerId: customer.id }
