@@ -1,16 +1,34 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const dateStr = searchParams.get("date"); // YYYY-MM-DD
+    
+    let whereClause = {};
+    
+    if (dateStr) {
+      // Filtrar apenas o dia selecionado (00:00:00 até 23:59:59)
+      const startDate = new Date(`${dateStr}T00:00:00.000Z`);
+      const endDate = new Date(`${dateStr}T23:59:59.999Z`);
+      whereClause = {
+        date: {
+          gte: startDate,
+          lte: endDate,
+        }
+      };
+    }
+
     const appointments = await prisma.appointment.findMany({
+      where: whereClause,
       include: {
         customer: true,
         barber: true,
         service: true,
       },
       orderBy: {
-        date: 'asc',
+        startTime: 'asc',
       },
     });
     
