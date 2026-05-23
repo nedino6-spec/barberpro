@@ -96,25 +96,37 @@ async function startBot() {
 
       if (['oi', 'olá', 'ola', 'ola!', 'oi!', 'menu'].includes(text)) {
         session.step = 1;
-        await send(`Olá! Bem-vindo(a) à *BarberPro* ✂️\n\nComo posso te ajudar hoje?\n\n*1.* 📅 Agendar Horário\n*2.* 🎁 Ver Meus Pontos (Fidelidade)\n*3.* 🚶‍♂️ Entrar na Fila Virtual (Agora)\n*4.* 👨‍💼 Falar com Atendente`);
+        await send(`Olá! Bem-vindo(a) à *BarberPro* ✂️\n\nComo posso te ajudar hoje?\n\n1️⃣ Entrar na fila (Agora)\n2️⃣ Agendar um horário (Futuro)\n3️⃣ Ver nosso catálogo\n4️⃣ Minha posição na fila\n5️⃣ Meus pontos de fidelidade\n6️⃣ Sobre nosso Clube VIP\n7️⃣ Avaliar atendimento\n8️⃣ Sair`);
         continue;
       }
 
       if (session.step === 1) {
         if (text === '1') {
-          await send(`🗓️ *Agendamento*\nPor favor, digite o *dia e horário* da sua preferência para verificarmos a disponibilidade na agenda.`);
-          session.step = 0;
-        } else if (text === '2') {
-          await send(`🎁 *Fidelidade*\nVocê possui *150 Pontos* (Cliente Prata)!\nFalta pouco para ganhar um Corte Grátis! 🎉`);
-          session.step = 0;
-        } else if (text === '3') {
           await send(`🚶 *Fila Virtual*\nVocê foi adicionado à fila! ✅\nSua posição: *3º*\nTempo estimado: *45 min*.\nAvisaremos quando estiver quase na sua vez!`);
           session.step = 0;
+        } else if (text === '2') {
+          await send(`🗓️ *Agendamento*\nPor favor, digite o *dia e horário* da sua preferência para verificarmos a disponibilidade na agenda.`);
+          session.step = 0;
+        } else if (text === '3') {
+          await send(`✂️ *Catálogo de Serviços*\n- Corte Degradê: R$ 45,00\n- Barba Terapia: R$ 35,00\n- Corte + Barba: R$ 70,00\n- Sobrancelha: R$ 15,00\n\nQual serviço você deseja realizar?`);
+          session.step = 0;
         } else if (text === '4') {
-          await send(`👨‍💼 Um atendente já vai te ajudar. Aguarde um instante!`);
+          await send(`⏳ *Posição na Fila*\nNo momento você está na *3ª posição*.\nFaltam aproximadamente *45 minutos* para o seu atendimento.`);
+          session.step = 0;
+        } else if (text === '5') {
+          await send(`🎁 *Fidelidade*\nVocê possui *150 Pontos* (Cliente Prata)!\nFalta pouco para ganhar um Corte Grátis! 🎉`);
+          session.step = 0;
+        } else if (text === '6') {
+          await send(`👑 *Clube VIP BarberPro*\nAssine nosso clube e ganhe:\n- Cortes ilimitados no mês\n- 20% OFF em produtos\n- Bebida cortesia\nFale com nossos barbeiros para aderir!`);
+          session.step = 0;
+        } else if (text === '7') {
+          await send(`⭐ *Avaliação*\nDe 1 a 5, que nota você dá para o seu último atendimento?`);
+          session.step = 0;
+        } else if (text === '8') {
+          await send(`👋 *Saindo*\nObrigado por falar conosco! Se precisar, é só digitar *menu* novamente.`);
           session.step = 0;
         } else {
-          await send(`Desculpe, não entendi. Digite *menu* para ver as opções novamente.`);
+          await send(`Desculpe, não entendi. Por favor, escolha um número de 1 a 8 ou digite *menu*.`);
         }
         continue;
       }
