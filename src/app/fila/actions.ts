@@ -41,16 +41,43 @@ export async function addToQueue(formData: FormData) {
 }
 
 export async function completeQueueItem(id: string) {
+  // 1. Marca como concluído
   await prisma.queueManager.update({
     where: { id },
     data: { status: "COMPLETED" }
   });
 
-  // Recalcular posições
-  // ...
+  // 2. Busca a fila atualizada (em ordem de chegada)
+  const activeQueue = await prisma.queueManager.findMany({
+    where: { status: "WAITING" },
+    orderBy: { createdAt: 'asc' },
+    include: { customer: true }
+  });
 
+  // 3. Se a fila tem 3 ou mais pessoas, o 3º acabou de assumir essa posição
+  if (activeQueue.length >= 3) {
+    const thirdPerson = activeQueue[2]; // index 2 = 3ª posição
+    
+    // 4. Envia o alerta via Robô WhatsApp
+    try {
+      const botApiUrl = "https://barberpro-whatsapp-bot.onrender.com";
+      await fetch(`${botApiUrl}/api/send-alert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: thirdPerson.customer.phone,
+          message: `⏳ *Fila Virtual - BarberPro*\nPrepare-se, *${thirdPerson.customer.name}*!\nVocê acabou de assumir o *3º lugar da fila*. Por favor, dirija-se à barbearia para não perder o seu lugar! ✂️`
+        })
+      });
+      console.log(`[Bot] Alerta enviado para o 3º da fila: ${thirdPerson.customer.name}`);
+    } catch (e) {
+      console.log("Erro ao enviar alerta WhatsApp:", e);
+    }
+  }
+
+  // Notificar painel via WebSocket (opcional/futuro)
   try {
-    const apiUrl = process.env.WHATSAPP_API_URL || "http://localhost:3001";
+    const apiUrl = process.env.WHATSAPP_API_URL || "https://barberpro-whatsapp-bot.onrender.com";
     await fetch(`${apiUrl}/fila/update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
