@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, UserCircle2, Phone, Save, Ban, Clock, CalendarCheck } from "lucide-react";
+import { ArrowLeft, UserCircle2, Phone, Save, Ban, Clock, CalendarCheck, Star, Banknote } from "lucide-react";
 
 export default function ClientePerfilPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
@@ -174,25 +174,56 @@ export default function ClientePerfilPage(props: { params: Promise<{ id: string 
           </div>
         </div>
 
-        {/* Coluna Direita - Painel de Controle */}
+        {/* Coluna Direita - Painel de Controle e Finanças */}
         <div className="flex flex-col gap-6">
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold text-lg border-b border-border pb-3 mb-4 text-foreground">
-              Métricas
+          
+          {/* Cartão VIP (Fidelidade) */}
+          <div className="bg-gradient-to-br from-primary to-primary-hover text-white border border-primary-hover rounded-2xl p-6 shadow-glow relative overflow-hidden">
+            <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+            <h2 className="font-bold text-lg pb-3 mb-4 flex items-center gap-2 border-b border-white/20">
+              <Star className="w-5 h-5 fill-white" /> Cartão VIP
             </h2>
-            <div className="flex flex-col gap-4">
-              <div className="bg-background rounded-xl p-4 border border-border">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total de Visitas</p>
-                <p className="text-3xl font-black text-primary">{customer.totalVisits}</p>
-              </div>
-              <div className="bg-background rounded-xl p-4 border border-border">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Cliente Desde</p>
-                <p className="text-sm font-bold text-foreground">{new Date(customer.createdAt).toLocaleDateString("pt-BR")}</p>
-              </div>
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-white/70">Pontos Acumulados</p>
+              <p className="text-4xl font-black">{customer.loyalty?.points || 0}</p>
+              <p className="text-[10px] mt-2 opacity-80">* 1 Ponto a cada R$ 1,00 gasto. Apenas para clientes sem débitos.</p>
             </div>
           </div>
 
-          <div className="bg-danger/5 border border-danger/20 rounded-2xl p-6 shadow-sm">
+          {/* Finanças (Fiado) */}
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+            <h2 className="font-bold text-lg border-b border-border pb-3 mb-4 text-foreground flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-success" /> Financeiro
+            </h2>
+            <div className="flex flex-col gap-4">
+              <div className={`rounded-xl p-4 border ${customer.finance?.debtBalance > 0 ? 'bg-danger/5 border-danger/20' : 'bg-success/5 border-success/20'}`}>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Dívida Atual (Fiado)</p>
+                <p className={`text-3xl font-black ${customer.finance?.debtBalance > 0 ? 'text-danger' : 'text-success'}`}>
+                  R$ {(customer.finance?.debtBalance || 0).toFixed(2)}
+                </p>
+              </div>
+              {customer.finance?.debtBalance > 0 && (
+                <button 
+                  onClick={async () => {
+                    if(confirm("Confirma o pagamento/quitação dessa dívida?")) {
+                      try {
+                        const res = await fetch(`/api/clientes/${customer.id}/pay-debt`, { method: "POST" });
+                        if(res.ok) {
+                          alert("Dívida quitada com sucesso!");
+                          window.location.reload();
+                        }
+                      } catch(e) {}
+                    }
+                  }}
+                  className="w-full py-3 bg-success hover:bg-success/90 text-white rounded-xl font-bold shadow-glow transition-all active:scale-95"
+                >
+                  Quitar Dívida
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Area de Risco */}
             <h2 className="font-bold text-lg border-b border-danger/20 pb-3 mb-4 text-danger flex items-center gap-2">
               <Ban className="w-5 h-5" /> Área de Risco
             </h2>

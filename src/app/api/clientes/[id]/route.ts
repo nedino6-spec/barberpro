@@ -10,7 +10,9 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         appointments: {
           orderBy: { date: 'desc' },
           take: 5
-        }
+        },
+        finance: true,
+        loyalty: true
       }
     });
 

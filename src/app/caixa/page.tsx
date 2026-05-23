@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Monitor, ShoppingCart, Scissors, Package, Trash2, CheckCircle2, CreditCard, Banknote, Landmark } from "lucide-react";
+import { Monitor, ShoppingCart, Scissors, Package, Trash2, CheckCircle2, CreditCard, Banknote, Landmark, AlertCircle, User } from "lucide-react";
 
 export default function CaixaPage() {
   const [services, setServices] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [cart, setCart] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("PIX");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
@@ -20,12 +22,14 @@ export default function CaixaPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resSrv, resProd] = await Promise.all([
+      const [resSrv, resProd, resCust] = await Promise.all([
         fetch("/api/services"),
-        fetch("/api/inventory")
+        fetch("/api/inventory"),
+        fetch("/api/clientes")
       ]);
       setServices(await resSrv.json());
       setProducts(await resProd.json());
+      setCustomers(await resCust.json());
     } catch (error) {
       console.error("Erro ao carregar catálogo", error);
     } finally {
@@ -68,7 +72,8 @@ export default function CaixaPage() {
       const payload = {
         items: cart,
         paymentMethod,
-        totalAmount: cartTotal
+        totalAmount: cartTotal,
+        customerId: selectedCustomerId || null
       };
 
       const res = await fetch("/api/pdv/checkout", {
@@ -162,6 +167,22 @@ export default function CaixaPage() {
               </div>
             )}
 
+            <div className="flex flex-col gap-2 mb-2">
+              <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1">
+                <User className="w-3 h-3" /> Cliente (Para Pontos/Fiado)
+              </label>
+              <select 
+                value={selectedCustomerId} 
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl px-4 py-2.5 outline-none focus:border-primary text-sm font-medium"
+              >
+                <option value="">Selecione um cliente (Opcional)</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} - {c.phone}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex gap-2 mb-2">
               <button onClick={() => setPaymentMethod("PIX")} className={`flex-1 py-2 border rounded-xl flex items-center justify-center gap-1 font-bold text-xs transition-colors ${paymentMethod === "PIX" ? "bg-primary text-white border-primary" : "bg-card text-muted-foreground border-border"}`}>
                 <Landmark className="w-4 h-4" /> PIX
@@ -171,6 +192,9 @@ export default function CaixaPage() {
               </button>
               <button onClick={() => setPaymentMethod("DINHEIRO")} className={`flex-1 py-2 border rounded-xl flex items-center justify-center gap-1 font-bold text-xs transition-colors ${paymentMethod === "DINHEIRO" ? "bg-primary text-white border-primary" : "bg-card text-muted-foreground border-border"}`}>
                 <Banknote className="w-4 h-4" /> Dinheiro
+              </button>
+              <button onClick={() => setPaymentMethod("PENDENTE")} className={`flex-1 py-2 border rounded-xl flex items-center justify-center gap-1 font-bold text-xs transition-colors ${paymentMethod === "PENDENTE" ? "bg-danger text-white border-danger" : "bg-card text-muted-foreground border-border"}`}>
+                <AlertCircle className="w-4 h-4" /> Fiado
               </button>
             </div>
 
