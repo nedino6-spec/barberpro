@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Users, Scissors, DollarSign } from "lucide-react";
+import { Home, Calendar, Users, Scissors, DollarSign, LayoutDashboard, Package, ListTodo } from "lucide-react";
 import { motion } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -12,10 +12,11 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const tabs = [
-  { name: "Início", href: "/", icon: Home },
+  { name: "Painel", href: "/", icon: LayoutDashboard },
   { name: "Agenda", href: "/agenda", icon: Calendar },
-  { name: "Fila", href: "/fila", icon: Users },
-  { name: "Serviços", href: "/servicos", icon: Scissors },
+  { name: "Estoque", href: "/estoque", icon: Package },
+  { name: "Clientes", href: "/clientes", icon: Users },
+  { name: "Fila", href: "/fila", icon: ListTodo },
   { name: "Financeiro", href: "/financeiro", icon: DollarSign },
 ];
 

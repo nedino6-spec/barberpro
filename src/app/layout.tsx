@@ -44,10 +44,11 @@ export default function RootLayout({
             <nav className="flex flex-col gap-2">
               <Link href="/" className="nav-item active">📊 Dashboard</Link>
               <Link href="/agenda" className="nav-item">📅 Agenda</Link>
+              <Link href="/financeiro" className="nav-item">💰 Financeiro</Link>
+              <Link href="/estoque" className="nav-item">📦 Estoque</Link>
               <Link href="/fila" className="nav-item">🚶‍♂️ Fila Virtual</Link>
               <Link href="/clientes" className="nav-item">👥 Clientes</Link>
               <Link href="/servicos" className="nav-item">✂️ Serviços</Link>
-              <Link href="/financeiro" className="nav-item">💰 Financeiro</Link>
               <Link href="/configuracoes/whatsapp" className="nav-item">📱 WhatsApp Bot</Link>
             </nav>
           </aside>
