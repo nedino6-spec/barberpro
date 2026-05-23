@@ -37,6 +37,7 @@ model Customer {
   loyalty       LoyaltySystem?
   finance       CustomerFinance?
   queueItem     QueueManager?
+  reviews       Review[]
 }
 
 model Service {
@@ -181,3 +182,15 @@ model MarketingCampaigns {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
+
+model Review {
+  id             String    @id @default(uuid())
+  rating         Int
+  comment        String?
+  
+  customerId     String
+  customer       Customer  @relation(fields: [customerId], references: [id])
+  
+  createdAt      DateTime  @default(now())
+}
+

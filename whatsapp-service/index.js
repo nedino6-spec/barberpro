@@ -15,8 +15,10 @@ app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
-// Estado em memória (sem arquivo - compatível com qualquer servidor)
+const API_BASE_URL = 'https://barberpro-tau.vercel.app/api/bot';
+
 let state = { status: 'STARTING', qr: null, qrImage: null };
+let globalSock = null; // Referência global para enviar mensagens pela API externa
 
 function updateState(newState) {
   state = { ...state, ...newState };
@@ -39,6 +41,8 @@ async function startBot() {
     browser: ['BarberPro', 'Chrome', '1.0.0'],
   });
 
+  globalSock = sock;
+
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
@@ -54,12 +58,12 @@ async function startBot() {
     }
 
     if (connection === 'close') {
+      globalSock = null;
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
       console.log('[WhatsApp] Conexão fechada. Motivo:', reason);
 
       if (reason === DisconnectReason.loggedOut) {
         updateState({ status: 'DISCONNECTED', qr: null, qrImage: null });
-        console.log('[WhatsApp] Sessão encerrada pelo usuário. Reiniciando...');
         setTimeout(startBot, 3000);
       } else {
         updateState({ status: 'RECONNECTING', qr: null, qrImage: null });
@@ -73,15 +77,13 @@ async function startBot() {
     }
   });
 
-  // ---------------------------------------------------------
-  // CHATBOT INTELIGENTE - AUTO RESPOSTA
-  // ---------------------------------------------------------
   sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages) {
       if (!msg.message || msg.key.fromMe) continue;
 
       const from = msg.key.remoteJid;
       if (from.endsWith('@g.us')) continue; // Ignora grupos
+      const phoneOnly = from.split('@')[0];
 
       const text = (
         msg.message?.conversation ||
@@ -100,28 +102,80 @@ async function startBot() {
         continue;
       }
 
+      if (session.step === 7) {
+        // Aguardando nota
+        const nota = parseInt(text);
+        if (nota >= 1 && nota <= 5) {
+          try {
+            await fetch(`${API_BASE_URL}/review`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: phoneOnly, rating: nota })
+            });
+            await send(`Obrigado pela sua avaliação de ${nota} estrelas! Isso nos ajuda muito. ⭐`);
+          } catch(e) {
+            await send(`Obrigado! Avaliação registrada.`);
+          }
+        } else {
+          await send(`Por favor, digite apenas um número de 1 a 5.`);
+        }
+        session.step = 0;
+        continue;
+      }
+
       if (session.step === 1) {
         if (text === '1') {
-          await send(`🚶 *Fila Virtual*\nVocê foi adicionado à fila! ✅\nSua posição: *3º*\nTempo estimado: *45 min*.\nAvisaremos quando estiver quase na sua vez!`);
+          try {
+            const res = await fetch(`${API_BASE_URL}/queue`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: phoneOnly, name: msg.pushName || 'Cliente' })
+            });
+            const data = await res.json();
+            if (data.error) await send(`⚠️ ${data.error}`);
+            else await send(`🚶 *Fila Virtual*\nVocê entrou na fila! ✅\nSua posição atual é a *${data.position}ª*.\nFique atento: Avisaremos quando você for o 3º da fila!`);
+          } catch(e) {
+             await send(`Erro ao entrar na fila, tente novamente.`);
+          }
           session.step = 0;
         } else if (text === '2') {
           await send(`🗓️ *Agendamento*\nPor favor, digite o *dia e horário* da sua preferência para verificarmos a disponibilidade na agenda.`);
           session.step = 0;
         } else if (text === '3') {
-          await send(`✂️ *Catálogo de Serviços*\n- Corte Degradê: R$ 45,00\n- Barba Terapia: R$ 35,00\n- Corte + Barba: R$ 70,00\n- Sobrancelha: R$ 15,00\n\nQual serviço você deseja realizar?`);
+          await sock.sendMessage(from, { 
+            image: { url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=600' }, 
+            caption: `✂️ *Catálogo de Serviços*\n- Corte Degradê: R$ 45,00\n- Barba Terapia: R$ 35,00\n- Corte + Barba: R$ 70,00\n- Sobrancelha: R$ 15,00\n\nResponda com o serviço desejado!` 
+          });
           session.step = 0;
-        } else if (text === '4') {
-          await send(`⏳ *Posição na Fila*\nNo momento você está na *3ª posição*.\nFaltam aproximadamente *45 minutos* para o seu atendimento.`);
-          session.step = 0;
-        } else if (text === '5') {
-          await send(`🎁 *Fidelidade*\nVocê possui *150 Pontos* (Cliente Prata)!\nFalta pouco para ganhar um Corte Grátis! 🎉`);
+        } else if (text === '4' || text === '5') {
+          try {
+            const res = await fetch(`${API_BASE_URL}/customer?phone=${phoneOnly}`);
+            const data = await res.json();
+            if (data.error) {
+              await send(`⚠️ Você ainda não possui cadastro. Digite 1 para entrar na fila e criar seu perfil automaticamente!`);
+            } else {
+              if (text === '4') {
+                const pos = data.customer.queuePosition;
+                if (pos) await send(`⏳ *Posição na Fila*\nVocê está na *${pos}ª* posição no momento.`);
+                else await send(`Você não está na fila no momento.`);
+              } else if (text === '5') {
+                let txt = `🎁 *Fidelidade*\nVocê possui *${data.customer.points} Pontos* (${data.customer.vipLevel})!\nFalta pouco para ganhar seu prêmio! 🎉`;
+                if (data.customer.debtBalance > 0) {
+                  txt += `\n\n⚠️ *Aviso Financeiro*\nVocê possui um saldo pendente (fiado) de *R$ ${data.customer.debtBalance.toFixed(2)}*. Por favor, consulte o balcão.`;
+                }
+                await send(txt);
+              }
+            }
+          } catch(e) {
+            await send(`Erro ao buscar dados. Tente novamente.`);
+          }
           session.step = 0;
         } else if (text === '6') {
           await send(`👑 *Clube VIP BarberPro*\nAssine nosso clube e ganhe:\n- Cortes ilimitados no mês\n- 20% OFF em produtos\n- Bebida cortesia\nFale com nossos barbeiros para aderir!`);
           session.step = 0;
         } else if (text === '7') {
-          await send(`⭐ *Avaliação*\nDe 1 a 5, que nota você dá para o seu último atendimento?`);
-          session.step = 0;
+          session.step = 7;
+          await send(`⭐ *Avaliação*\nDe 1 a 5, que nota você dá para o seu último atendimento? (Digite apenas o número)`);
         } else if (text === '8') {
           await send(`👋 *Saindo*\nObrigado por falar conosco! Se precisar, é só digitar *menu* novamente.`);
           session.step = 0;
@@ -150,22 +204,24 @@ app.get('/status', (req, res) => {
   });
 });
 
-// Rota para enviar mensagem
-app.post('/send', async (req, res) => {
+// Rota para enviar mensagens avulsas (Alerta de fila)
+app.post('/api/send-alert', async (req, res) => {
   try {
-    const { number, message } = req.body;
-    if (!number || !message) return res.status(400).json({ error: 'Número e mensagem são obrigatórios' });
-    // Nota: Precisaria de referência ao sock - implementação futura
-    res.json({ success: true, note: 'Mensagem enfileirada' });
+    const { phone, message } = req.body;
+    if (!phone || !message) return res.status(400).json({ error: 'Número e mensagem são obrigatórios' });
+    if (!globalSock) return res.status(503).json({ error: 'Bot desconectado' });
+    
+    // Formatar número para o formato do WhatsApp (BR)
+    let formatNumber = phone;
+    if (!formatNumber.includes('@s.whatsapp.net')) {
+      formatNumber = `${phone}@s.whatsapp.net`;
+    }
+
+    await globalSock.sendMessage(formatNumber, { text: message });
+    res.json({ success: true, note: 'Mensagem enviada com sucesso!' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
-});
-
-// Rota para atualizar fila em tempo real
-app.post('/fila/update', (req, res) => {
-  io.emit('queue_updated', req.body);
-  res.json({ success: true });
 });
 
 // Health check
