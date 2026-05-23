@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clock, Scissors, Plus, Save, Trash2, Edit2, AlertCircle } from "lucide-react";
+import { Clock, Scissors, Plus, Save, Trash2, Edit2, AlertCircle, Crown } from "lucide-react";
 import { motion } from "framer-motion";
 
 const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 export default function ConfiguracoesPage() {
-  const [activeTab, setActiveTab] = useState<"services" | "hours" | "queue">("services");
+  const [activeTab, setActiveTab] = useState<"services" | "hours" | "queue" | "plans">("services");
   
   // Services State
   const [services, setServices] = useState<any[]>([]);
@@ -25,10 +25,17 @@ export default function ConfiguracoesPage() {
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [savingQueue, setSavingQueue] = useState(false);
 
+  // Plans State
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<any>({ name: "", description: "", price: "" });
+
   useEffect(() => {
     fetchServices();
     fetchHours();
     fetchQueueConfig();
+    fetchPlans();
   }, []);
 
   const fetchServices = async () => {
@@ -58,6 +65,16 @@ export default function ConfiguracoesPage() {
       setQueueConfig(await res.json());
     } finally {
       setLoadingQueue(false);
+    }
+  };
+
+  const fetchPlans = async () => {
+    setLoadingPlans(true);
+    try {
+      const res = await fetch("/api/subscriptions/plans");
+      setPlans(await res.json());
+    } finally {
+      setLoadingPlans(false);
     }
   };
 
@@ -150,6 +167,25 @@ export default function ConfiguracoesPage() {
     }
   };
 
+  const handleSavePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/subscriptions/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentPlan)
+      });
+      if (res.ok) {
+        setIsPlanModalOpen(false);
+        fetchPlans();
+      } else {
+        alert("Erro ao salvar plano");
+      }
+    } catch (e) {
+      alert("Erro de conexão");
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div>
@@ -176,6 +212,12 @@ export default function ConfiguracoesPage() {
           className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "queue" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-bg-tertiary"}`}
         >
           <AlertCircle className="w-4 h-4" /> Fila Virtual
+        </button>
+        <button 
+          onClick={() => setActiveTab("plans")}
+          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "plans" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-bg-tertiary"}`}
+        >
+          <Crown className="w-4 h-4" /> Clube VIP
         </button>
       </div>
 
@@ -382,6 +424,37 @@ export default function ConfiguracoesPage() {
                   </div>
                 </div>
 
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===================== TAB PLANOS (CLUB) ===================== */}
+        {activeTab === "plans" && (
+          <div className="flex flex-col gap-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold">Planos do Clube</h2>
+              <button onClick={() => { setCurrentPlan({ name: "", description: "", price: "" }); setIsPlanModalOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover shadow-glow transition-all active:scale-95">
+                <Plus className="w-4 h-4" /> Novo Plano
+              </button>
+            </div>
+
+            {loadingPlans ? (
+              <div className="text-center py-8 text-muted-foreground animate-pulse">Carregando planos...</div>
+            ) : plans.length === 0 ? (
+              <div className="text-center py-10 bg-background border border-dashed border-border rounded-xl text-muted-foreground">
+                <p>Nenhum plano cadastrado.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {plans.map((plan) => (
+                  <div key={plan.id} className="bg-background border border-border p-5 rounded-2xl shadow-sm hover:border-primary transition-colors">
+                    <h3 className="font-bold text-lg mb-1">{plan.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
+                    <p className="text-2xl font-black text-primary mb-2">R$ {plan.price.toFixed(2)}</p>
+                    <div className="text-xs font-bold text-muted-foreground uppercase bg-card border border-border px-3 py-1 rounded-full inline-block">Mensal</div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

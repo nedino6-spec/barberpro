@@ -34,6 +34,8 @@ model Tenant {
   campaigns         MarketingCampaigns[]
   reviews           Review[]
   businessHours     BusinessHour[]
+  subscriptionPlans SubscriptionPlan[]
+  customerSubscriptions CustomerSubscription[]
 }
 
 model User {
@@ -72,6 +74,7 @@ model Customer {
   appointments  Appointment[]
   loyalty       LoyaltySystem?
   finance       CustomerFinance?
+  subscription  CustomerSubscription?
   queueItem     QueueManager?
   reviews       Review[]
 }
@@ -277,4 +280,36 @@ model BusinessHour {
   updatedAt   DateTime @updatedAt
 }
 
+model SubscriptionPlan {
+  id              String    @id @default(uuid())
+  name            String
+  description     String?
+  price           Float
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
+  subscriptions   CustomerSubscription[]
+}
+
+model CustomerSubscription {
+  id              String    @id @default(uuid())
+  status          String    @default("ACTIVE") // ACTIVE, CANCELED, PAST_DUE
+  startDate       DateTime  @default(now())
+  validUntil      DateTime
+  
+  customerId      String    @unique
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  
+  planId          String
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+  
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}

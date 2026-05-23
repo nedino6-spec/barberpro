@@ -2,12 +2,13 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, UserCircle2, Phone, Save, Ban, Clock, CalendarCheck, Star, Banknote } from "lucide-react";
+import { ArrowLeft, UserCircle2, Phone, Save, Ban, Clock, CalendarCheck, Star, Banknote, Crown } from "lucide-react";
 
 export default function ClientePerfilPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
   const router = useRouter();
   const [customer, setCustomer] = useState<any>(null);
+  const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -22,13 +23,20 @@ export default function ClientePerfilPage(props: { params: Promise<{ id: string 
 
   const fetchCustomer = async () => {
     try {
-      const res = await fetch(`/api/clientes/${params.id}`);
-      if (!res.ok) throw new Error("Não encontrado");
-      const data = await res.json();
+      const [resCust, resPlans] = await Promise.all([
+        fetch(`/api/clientes/${params.id}`),
+        fetch(`/api/subscriptions/plans`)
+      ]);
+      if (!resCust.ok) throw new Error("Não encontrado");
+      const data = await resCust.json();
       setCustomer(data);
       setName(data.name || "");
       setPhone(data.phone || "");
       setNotes(data.notes || "");
+      
+      if (resPlans.ok) {
+        setPlans(await resPlans.json());
+      }
     } catch (e) {
       alert("Cliente não encontrado.");
       router.push("/clientes");
@@ -221,6 +229,75 @@ export default function ClientePerfilPage(props: { params: Promise<{ id: string 
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Clube da Barba (Assinatura) */}
+          <div className="bg-gradient-to-br from-gray-900 to-black text-white border border-gray-800 rounded-2xl p-6 shadow-glow relative overflow-hidden">
+            <h2 className="font-bold text-lg pb-3 mb-4 flex items-center gap-2 border-b border-white/10">
+              <Crown className="w-5 h-5 text-yellow-500" /> Clube da Barba
+            </h2>
+            
+            {customer.subscription && customer.subscription.status === "ACTIVE" ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10">
+                  <div>
+                    <p className="text-xs text-white/50 uppercase font-bold tracking-wider">Plano Atual</p>
+                    <p className="font-bold text-yellow-500">{customer.subscription.plan?.name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-white/50 uppercase font-bold tracking-wider">Vence em</p>
+                    <p className="font-bold text-white">{new Date(customer.subscription.validUntil).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={async () => {
+                    try {
+                      await fetch(`/api/clientes/${customer.id}/subscribe`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ planId: customer.subscription.planId, months: 1 })
+                      });
+                      alert("Assinatura renovada por +1 mês!");
+                      window.location.reload();
+                    } catch(e) {}
+                  }}
+                  className="w-full mt-2 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 rounded-xl font-bold transition-all text-sm"
+                >
+                  Renovar (+1 Mês)
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-white/70">O cliente não assina nenhum plano atualmente.</p>
+                <select 
+                  id="planSelect"
+                  className="w-full bg-black border border-white/20 rounded-xl px-4 py-2 outline-none focus:border-yellow-500 text-sm"
+                >
+                  <option value="">Selecione um plano...</option>
+                  {plans.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} - R$ {p.price.toFixed(2)}</option>
+                  ))}
+                </select>
+                <button 
+                  onClick={async () => {
+                    const sel = document.getElementById("planSelect") as HTMLSelectElement;
+                    if(!sel.value) return alert("Selecione um plano!");
+                    try {
+                      await fetch(`/api/clientes/${customer.id}/subscribe`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ planId: sel.value, months: 1 })
+                      });
+                      alert("Assinatura ativada!");
+                      window.location.reload();
+                    } catch(e) {}
+                  }}
+                  className="w-full py-2 bg-yellow-500 text-black hover:bg-yellow-400 rounded-xl font-bold shadow-glow transition-all"
+                >
+                  Ativar Assinatura
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Area de Risco */}

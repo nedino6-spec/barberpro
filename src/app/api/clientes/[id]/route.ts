@@ -12,7 +12,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
           take: 5
         },
         finance: true,
-        loyalty: true
+        loyalty: true,
+        subscription: {
+          include: { plan: true }
+        }
       }
     });
 

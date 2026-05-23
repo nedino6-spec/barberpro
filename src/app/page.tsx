@@ -1,207 +1,164 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, DollarSign, Users, Clock, Scissors, Plus, Settings, TrendingUp } from "lucide-react";
-import { motion } from "framer-motion";
-import { ConfiguracaoDashboardModal, DashboardConfig } from "@/components/dashboard/ConfiguracaoDashboardModal";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
+import { Users, TrendingUp, Calendar as CalendarIcon, Crown } from "lucide-react";
+import Link from "next/link";
 
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
-
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
-};
-
-export default function Dashboard() {
-  const [data, setData] = useState<any>(null);
+export default function DashboardPage() {
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  
-  const [config, setConfig] = useState<DashboardConfig>({
-    showFinance: true,
-    showAppointmentsCount: true,
-    showNewCustomers: true,
-    showUpcomingAppointments: true,
-    showPopularServices: true,
-  });
 
   useEffect(() => {
-    // Load config from localStorage
-    const saved = localStorage.getItem("dashboardConfig");
-    if (saved) {
-      try { setConfig(JSON.parse(saved)); } catch(e){}
-    }
-
-    // Fetch dashboard summary
-    fetch("/api/dashboard/summary")
+    fetch("/api/dashboard/stats")
       .then(res => res.json())
-      .then(d => {
-        setData(d);
-        setLoading(false);
-      })
-      .catch(e => {
-        console.error(e);
+      .then(data => {
+        setStats(data);
         setLoading(false);
       });
   }, []);
 
-  const handleSaveConfig = (newConfig: DashboardConfig) => {
-    setConfig(newConfig);
-    localStorage.setItem("dashboardConfig", JSON.stringify(newConfig));
-  };
-
-  const formatMoney = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      {/* Header Mobile / Desktop */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">Resumo das atividades de hoje.</p>
-        </div>
+    <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-10">
+      
+      {/* Cabeçalho */}
+      <div>
+        <h1 className="text-3xl font-black text-foreground mb-2">Visão Geral</h1>
+        <p className="text-muted-foreground text-sm">Acompanhe as métricas de crescimento da sua Barbearia.</p>
+      </div>
+
+      {/* Cards de Métricas Principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        <div className="flex gap-2 w-full md:w-auto">
-          <button 
-            onClick={() => setIsConfigOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium hover:bg-bg-tertiary transition-colors active:scale-95"
-          >
-            <Settings className="w-4 h-4" />
-            <span className="hidden md:inline">Configurar</span>
-          </button>
-          <button className="flex-[2] md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover shadow-glow transition-all active:scale-95">
-            <Plus className="w-4 h-4" />
-            Novo Agendamento
-          </button>
+        <div className="bg-gradient-to-br from-card to-bg-tertiary border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group hover:border-primary/50 transition-all">
+          <div className="absolute right-0 top-0 w-24 h-24 bg-success/5 rounded-bl-full group-hover:bg-success/10 transition-colors"></div>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-success/10 p-3 rounded-xl border border-success/20">
+              <TrendingUp className="w-6 h-6 text-success" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Faturamento (7d)</p>
+            </div>
+          </div>
+          <p className="text-3xl font-black text-foreground">R$ {(stats?.totalRevenue7Days || 0).toFixed(2)}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-card to-bg-tertiary border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group hover:border-primary/50 transition-all">
+          <div className="absolute right-0 top-0 w-24 h-24 bg-primary/5 rounded-bl-full group-hover:bg-primary/10 transition-colors"></div>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-primary/10 p-3 rounded-xl border border-primary/20">
+              <CalendarIcon className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Agendamentos Hoje</p>
+            </div>
+          </div>
+          <p className="text-3xl font-black text-foreground">{stats?.todayAppointments || 0}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-card to-bg-tertiary border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group hover:border-yellow-500/50 transition-all">
+          <div className="absolute right-0 top-0 w-24 h-24 bg-yellow-500/5 rounded-bl-full group-hover:bg-yellow-500/10 transition-colors"></div>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-yellow-500/10 p-3 rounded-xl border border-yellow-500/20">
+              <Crown className="w-6 h-6 text-yellow-500" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Clube da Barba</p>
+            </div>
+          </div>
+          <p className="text-3xl font-black text-foreground">{stats?.activeSubscriptions || 0}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-card to-bg-tertiary border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group hover:border-blue-500/50 transition-all">
+          <div className="absolute right-0 top-0 w-24 h-24 bg-blue-500/5 rounded-bl-full group-hover:bg-blue-500/10 transition-colors"></div>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-blue-500/10 p-3 rounded-xl border border-blue-500/20">
+              <Users className="w-6 h-6 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Clientes Base</p>
+            </div>
+          </div>
+          <p className="text-3xl font-black text-foreground">{stats?.totalCustomers || 0}</p>
+        </div>
+
+      </div>
+
+      {/* Gráfico Principal */}
+      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+        <h2 className="font-bold text-lg mb-6 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary" /> Faturamento dos Últimos 7 Dias
+        </h2>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={stats?.chartData || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#4ade80" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+              <XAxis dataKey="date" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$ ${val}`} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#111', borderColor: '#333', borderRadius: '8px', color: '#fff' }}
+                itemStyle={{ color: '#4ade80', fontWeight: 'bold' }}
+                formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Receita']}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="revenue" 
+                stroke="#4ade80" 
+                strokeWidth={3}
+                fillOpacity={1} 
+                fill="url(#colorRevenue)" 
+                activeDot={{ r: 6, fill: '#4ade80', stroke: '#fff', strokeWidth: 2 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-64 text-muted-foreground animate-pulse">Carregando painel...</div>
-      ) : (
-        <>
-          {/* Stats Grid */}
-          <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-            
-            {config.showAppointmentsCount && (
-              <motion.div variants={item} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary-light text-primary flex items-center justify-center">
-                  <Calendar className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Agendamentos (Hoje)</p>
-                  <h3 className="text-2xl font-bold text-foreground mt-0.5">{data?.todayAppointmentsCount || 0}</h3>
-                </div>
-              </motion.div>
-            )}
-            
-            {config.showFinance && (
-              <motion.div variants={item} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-success/20 text-success flex items-center justify-center">
-                  <DollarSign className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Faturamento (Hoje)</p>
-                  <h3 className="text-2xl font-bold text-success mt-0.5">{formatMoney(data?.todayRevenue)}</h3>
-                </div>
-              </motion.div>
-            )}
+      {/* Ações Rápidas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link href="/caixa" className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary transition-all flex items-center gap-4 group">
+          <div className="bg-bg-tertiary w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+            <TrendingUp className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+          </div>
+          <div>
+            <h3 className="font-bold">Abrir PDV</h3>
+            <p className="text-xs text-muted-foreground">Frente de caixa rápido</p>
+          </div>
+        </Link>
+        <Link href="/agenda" className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary transition-all flex items-center gap-4 group">
+          <div className="bg-bg-tertiary w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+            <CalendarIcon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+          </div>
+          <div>
+            <h3 className="font-bold">Agendamentos</h3>
+            <p className="text-xs text-muted-foreground">Gerenciar horários</p>
+          </div>
+        </Link>
+        <Link href="/clientes" className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary transition-all flex items-center gap-4 group">
+          <div className="bg-bg-tertiary w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+            <Users className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+          </div>
+          <div>
+            <h3 className="font-bold">Clientes VIP</h3>
+            <p className="text-xs text-muted-foreground">Clube da Barba & Fidelidade</p>
+          </div>
+        </Link>
+      </div>
 
-            {config.showNewCustomers && (
-              <motion.div variants={item} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-warning/20 text-warning flex items-center justify-center">
-                  <Users className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Novos Clientes</p>
-                  <h3 className="text-2xl font-bold text-foreground mt-0.5">{data?.newCustomersCount || 0}</h3>
-                </div>
-              </motion.div>
-            )}
-          </motion.div>
-
-          {/* Main Grid */}
-          <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* Próximos Agendamentos */}
-            {config.showUpcomingAppointments && (
-              <motion.div variants={item} className="bg-card border border-border rounded-2xl p-5 md:p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-primary" /> Próximos Agendamentos
-                  </h2>
-                  <button className="text-sm text-primary font-medium hover:underline">Ver Todos</button>
-                </div>
-                
-                <div className="flex flex-col gap-3">
-                  {data?.upcomingAppointments?.length === 0 ? (
-                    <p className="text-muted-foreground text-sm text-center py-4">Nenhum agendamento para as próximas horas.</p>
-                  ) : (
-                    data?.upcomingAppointments?.map((appt: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between p-3.5 bg-background border border-border rounded-xl">
-                        <div className="flex gap-3.5 items-center">
-                          <div className="text-lg font-bold text-primary w-14 text-center">{appt.time}</div>
-                          <div className="w-px h-10 bg-border hidden sm:block"></div>
-                          <div>
-                            <div className="font-semibold text-foreground">{appt.name || "Cliente Não Informado"}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{appt.service || "Serviço Padrão"} • {appt.barber || "-"}</div>
-                          </div>
-                        </div>
-                        <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${appt.color}`}>
-                          {appt.status}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </motion.div>
-            )}
-
-            {/* Serviços Populares */}
-            {config.showPopularServices && (
-              <motion.div variants={item} className="bg-card border border-border rounded-2xl p-5 md:p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-success" /> Serviços Populares
-                  </h2>
-                </div>
-                
-                <div className="flex flex-col gap-4">
-                  {data?.popularServices?.map((srv: any, i: number) => (
-                    <div key={i} className="relative">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium flex items-center gap-2">
-                          <Scissors className="w-4 h-4 text-muted-foreground" /> {srv.name}
-                        </span>
-                        <span className="text-sm text-muted-foreground font-semibold">{srv.val}</span>
-                      </div>
-                      <div className="w-full bg-background rounded-full h-2 overflow-hidden border border-border">
-                        <div className="bg-primary h-2 rounded-full" style={{ width: `${srv.percent}%` }}></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-
-          </motion.div>
-        </>
-      )}
-
-      <ConfiguracaoDashboardModal 
-        isOpen={isConfigOpen}
-        onClose={() => setIsConfigOpen(false)}
-        config={config}
-        onSave={handleSaveConfig}
-      />
     </div>
   );
 }
