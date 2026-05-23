@@ -7,6 +7,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String?  @unique // Para subdomínios (white-label)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  users             User[]
+  customers         Customer[]
+  services          Service[]
+  appointments      Appointment[]
+  finances          Finance[]
+  cashRegisters     CashRegister[]
+  inventory         Inventory[]
+  loyaltySystems    LoyaltySystem[]
+  customerFinances  CustomerFinance[]
+  queueItems        QueueManager[]
+  campaigns         MarketingCampaigns[]
+  reviews           Review[]
+  businessHours     BusinessHour[]
+}
+
 model User {
   id            String    @id @default(uuid())
   name          String
@@ -15,6 +38,9 @@ model User {
   role          String    @default("BARBER") // ADMIN, MANAGER, BARBER, RECEPTIONIST
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
   
   appointments  Appointment[] @relation("BarberAppointments")
   commissions   Finance[]     @relation("BarberCommissions")
@@ -33,6 +59,9 @@ model Customer {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
   appointments  Appointment[]
   loyalty       LoyaltySystem?
   finance       CustomerFinance?
@@ -50,6 +79,9 @@ model Service {
   pointsEarned    Int       @default(0) // Pontos que o cliente ganha ao fazer este serviço
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
 
   appointments    Appointment[]
 }
@@ -71,6 +103,9 @@ model Appointment {
   service     Service   @relation(fields: [serviceId], references: [id])
 
   finance     Finance?  
+  
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -95,6 +130,9 @@ model Finance {
   cashRegisterId   String?
   cashRegister     CashRegister? @relation(fields: [cashRegisterId], references: [id])
   
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
@@ -112,6 +150,9 @@ model CashRegister {
   
   finances       Finance[]
   
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -122,6 +163,10 @@ model Inventory {
   quantity    Int
   minQuantity Int
   price       Float
+  
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -138,6 +183,9 @@ model LoyaltySystem {
   customerId     String    @unique
   customer       Customer  @relation(fields: [customerId], references: [id])
   
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -149,6 +197,9 @@ model CustomerFinance {
   
   customerId     String    @unique
   customer       Customer  @relation(fields: [customerId], references: [id])
+  
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -166,6 +217,9 @@ model QueueManager {
   barberId       String?
   barber         User?     @relation("BarberQueue", fields: [barberId], references: [id])
   
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -179,6 +233,9 @@ model MarketingCampaigns {
   sentCount      Int       @default(0)
   targetAudience String    @default("ALL") // ALL, VIP, ABSENT_30_DAYS
   
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -191,6 +248,9 @@ model Review {
   customerId     String
   customer       Customer  @relation(fields: [customerId], references: [id])
   
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
   createdAt      DateTime  @default(now())
 }
 
@@ -202,6 +262,9 @@ model BusinessHour {
   closeTime   String?  // Ex: "19:00"
   breakStart  String?  // Ex: "12:00" (Almoço início)
   breakEnd    String?  // Ex: "13:00" (Almoço fim)
+  
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
