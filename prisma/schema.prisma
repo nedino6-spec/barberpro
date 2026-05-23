@@ -194,3 +194,17 @@ model Review {
   createdAt      DateTime  @default(now())
 }
 
+model BusinessHour {
+  id          String   @id @default(uuid())
+  dayOfWeek   Int      @unique // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  isClosed    Boolean  @default(false)
+  openTime    String?  // Ex: "09:00"
+  closeTime   String?  // Ex: "19:00"
+  breakStart  String?  // Ex: "12:00" (Almoço início)
+  breakEnd    String?  // Ex: "13:00" (Almoço fim)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
