@@ -102,7 +102,7 @@ async function startBot() {
 
       if (session.step === 1) {
         if (text === '1') {
-          await send(`🗓️ *Agendamento*\nAcesse para agendar:\n👉 https://barberpro-tau.vercel.app/agenda`);
+          await send(`🗓️ *Agendamento*\nPor favor, digite o *dia e horário* da sua preferência para verificarmos a disponibilidade na agenda.`);
           session.step = 0;
         } else if (text === '2') {
           await send(`🎁 *Fidelidade*\nVocê possui *150 Pontos* (Cliente Prata)!\nFalta pouco para ganhar um Corte Grátis! 🎉`);
