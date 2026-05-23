@@ -3,13 +3,13 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id;
+    const params = await props.params;
     const data = await request.json();
 
     const service = await prisma.service.update({
-      where: { id },
+      where: { id: params.id },
       data: {
         name: data.name,
         description: data.description,
@@ -27,8 +27,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
   try {
+    const params = await props.params;
     await prisma.service.delete({
       where: { id: params.id }
     });

@@ -6,7 +6,7 @@
     "dev": "next dev -H 0.0.0.0",
     "bot": "node whatsapp-service/index.js",
     "start:all": "concurrently \"npm run dev\" \"npm run bot\"",
-    "build": "next build",
+    "build": "prisma generate && prisma db push --accept-data-loss && next build",
     "start": "next start",
     "lint": "eslint"
   },

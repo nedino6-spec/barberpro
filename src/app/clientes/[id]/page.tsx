@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, UserCircle2, Phone, Save, Ban, Clock, CalendarCheck } from "lucide-react";
 
-export default function ClientePerfilPage({ params }: { params: { id: string } }) {
+export default function ClientePerfilPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const router = useRouter();
   const [customer, setCustomer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
