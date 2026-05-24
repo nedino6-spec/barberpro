@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Clock, Scissors, Plus, Save, Trash2, Edit2, AlertCircle, Crown } from "lucide-react";
 import { motion } from "framer-motion";
+import AvatarUpload from "./AvatarUpload";
 
 const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 

@@ -12,6 +12,8 @@ const usePrismaAuthState = require('./prisma-auth');
 
 // Inicializa o Worker do Google Sync em Background
 require('./worker');
+const cron = require('node-cron');
+const { format, addMinutes } = require('date-fns');
 
 const prisma = new PrismaClient();
 
@@ -192,10 +194,80 @@ async function startBot() {
         continue;
       }
 
+      const isCancellation = ['cancelar', 'desmarcar', 'não vou', 'nao vou'].some(word => text.includes(word));
+
+      if (isCancellation) {
+        // Encontra o agendamento mais próximo desse cliente
+        const upcomingApt = await prisma.appointment.findFirst({
+          where: {
+            customer: { phone: phoneOnly },
+            status: 'SCHEDULED',
+            date: { gte: new Date() }
+          },
+          orderBy: { date: 'asc' }
+        });
+
+        if (upcomingApt) {
+          await prisma.appointment.update({
+            where: { id: upcomingApt.id },
+            data: { status: 'CANCELLED' }
+          });
+          
+          io.emit('NOVO_AGENDAMENTO'); // Força a tela da barbearia atualizar!
+
+          await send(`✅ Seu agendamento para o dia ${format(upcomingApt.date, 'dd/MM')} às ${upcomingApt.startTime} foi cancelado com sucesso.\n\nSe quiser remarcar, é só mandar *menu*.`);
+        } else {
+          await send(`Você não possui nenhum agendamento próximo para cancelar. ✂️`);
+        }
+        continue;
+      }
+
       // Resposta padrão
       if (text.length > 0) {
         await send(`Olá! Digite *menu* para ver como posso te ajudar. ✂️`);
       }
+    }
+  });
+
+  // ========== CRON: LEMBRETES INTELIGENTES ==========
+  // Roda a cada 5 minutos
+  cron.schedule('*/5 * * * *', async () => {
+    if (state.status !== 'CONNECTED' || !globalSock) return;
+
+    try {
+      const now = new Date();
+      // Lembrete para daqui a 1 hora (60 mins)
+      const targetTime = addMinutes(now, 60);
+      const targetTimeStr = format(targetTime, 'HH:mm');
+      const dateStr = format(now, 'yyyy-MM-dd');
+
+      // Busca agendamentos que começam exatamente no targetTime e que não foram lembrados
+      const upcoming = await prisma.appointment.findMany({
+        where: {
+          date: new Date(dateStr),
+          startTime: targetTimeStr,
+          status: 'SCHEDULED',
+          // Uma coluna `reminderSent` seria ideal, mas no MVP usaremos apenas a hora exata.
+        },
+        include: {
+          customer: true,
+          barber: true,
+        }
+      });
+
+      for (const apt of upcoming) {
+        if (!apt.customer.phone) continue;
+        let formatNumber = apt.customer.phone;
+        if (!formatNumber.startsWith('55')) formatNumber = '55' + formatNumber;
+        const jid = `${formatNumber}@s.whatsapp.net`;
+        
+        const message = `🔔 *Lembrete BarberPro*\n\nOlá ${apt.customer.name}! Seu horário com ${apt.barber.name} é daqui a 1 hora (*${apt.startTime}*).\n\nCaso precise cancelar ou remarcar, responda esta mensagem!`;
+        
+        await globalSock.sendMessage(jid, { text: message });
+        console.log(`[Lembrete] Enviado para ${apt.customer.name}`);
+      }
+    } catch (error) {
+      console.error('[CRON] Erro ao enviar lembretes:', error);
     }
   });
 
