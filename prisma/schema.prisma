@@ -37,6 +37,7 @@ model Tenant {
   subscriptionPlans SubscriptionPlan[]
   customerSubscriptions CustomerSubscription[]
   whatsAppSessions  WhatsAppSession[]
+  googleIntegrations GoogleIntegration[]
 }
 
 model User {
@@ -55,6 +56,7 @@ model User {
   commissions   Finance[]     @relation("BarberCommissions")
   queueItems    QueueManager[] @relation("BarberQueue")
   cashRegisters CashRegister[] @relation("UserCashRegisters")
+  googleIntegration GoogleIntegration?
 }
 
 model Customer {
@@ -114,6 +116,8 @@ model Appointment {
   service     Service   @relation(fields: [serviceId], references: [id])
 
   finance     Finance?  
+  
+  googleEventId String?   @unique
   
   tenantId String?
   tenant Tenant? @relation(fields: [tenantId], references: [id])
@@ -233,6 +237,25 @@ model QueueManager {
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+model GoogleIntegration {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken     String   @db.Text
+  refreshToken    String   @db.Text
+  calendarId      String   @default("primary")
+  syncToken       String?  @db.Text
+  channelId       String?  // UUID para identificar o webhook channel no Google
+  resourceId      String?  // ID do recurso monitorado pelo webhook
+  channelExp      DateTime? // Expiração do webhook channel
+
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model MarketingCampaigns {

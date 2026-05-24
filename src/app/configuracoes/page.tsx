@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 export default function ConfiguracoesPage() {
-  const [activeTab, setActiveTab] = useState<"services" | "hours" | "queue" | "plans">("services");
+  const [activeTab, setActiveTab] = useState<"services" | "hours" | "queue" | "plans" | "integrations">("services");
   
   // Services State
   const [services, setServices] = useState<any[]>([]);
@@ -31,11 +31,16 @@ export default function ConfiguracoesPage() {
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<any>({ name: "", description: "", price: "" });
 
+  // Integrations State
+  const [barbers, setBarbers] = useState<any[]>([]);
+  const [loadingBarbers, setLoadingBarbers] = useState(true);
+
   useEffect(() => {
     fetchServices();
     fetchHours();
     fetchQueueConfig();
     fetchPlans();
+    fetchBarbers();
   }, []);
 
   const fetchServices = async () => {
@@ -75,6 +80,18 @@ export default function ConfiguracoesPage() {
       setPlans(await res.json());
     } finally {
       setLoadingPlans(false);
+    }
+  };
+
+  const fetchBarbers = async () => {
+    setLoadingBarbers(true);
+    try {
+      const res = await fetch("/api/barbers");
+      setBarbers(await res.json());
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setLoadingBarbers(false);
     }
   };
 
@@ -218,6 +235,12 @@ export default function ConfiguracoesPage() {
           className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "plans" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-bg-tertiary"}`}
         >
           <Crown className="w-4 h-4" /> Clube VIP
+        </button>
+        <button 
+          onClick={() => setActiveTab("integrations")}
+          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "integrations" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-bg-tertiary"}`}
+        >
+          Integrações
         </button>
       </div>
 
@@ -453,6 +476,50 @@ export default function ConfiguracoesPage() {
                     <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
                     <p className="text-2xl font-black text-primary mb-2">R$ {plan.price.toFixed(2)}</p>
                     <div className="text-xs font-bold text-muted-foreground uppercase bg-card border border-border px-3 py-1 rounded-full inline-block">Mensal</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===================== TAB INTEGRAÇÕES ===================== */}
+        {activeTab === "integrations" && (
+          <div className="flex flex-col gap-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold">Google Calendar 2-Way Sync</h2>
+            </div>
+            
+            <p className="text-sm text-muted-foreground mb-4">
+              Conecte a conta do Google de cada barbeiro para ativar a sincronização bidirecional em tempo real.
+            </p>
+
+            {loadingBarbers ? (
+              <div className="text-center py-8 text-muted-foreground animate-pulse">Carregando barbeiros...</div>
+            ) : barbers.length === 0 ? (
+              <div className="text-center py-10 bg-background border border-dashed border-border rounded-xl text-muted-foreground">
+                <p>Nenhum barbeiro encontrado.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {barbers.map((barber) => (
+                  <div key={barber.id} className="bg-background border border-border p-5 rounded-2xl shadow-sm flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-lg mb-1">{barber.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {barber.googleIntegration ? "✅ Google Conectado" : "❌ Google Não Conectado"}
+                      </p>
+                    </div>
+                    {barber.googleIntegration ? (
+                      <div className="px-4 py-2 bg-green-500/10 text-green-500 rounded-xl font-bold text-sm">Ativo</div>
+                    ) : (
+                      <button 
+                        onClick={() => window.location.href = `/api/google/auth?userId=${barber.id}`}
+                        className="px-4 py-2 bg-[#4285F4] text-white rounded-xl font-bold text-sm shadow-glow transition-all hover:bg-[#3367d6]"
+                      >
+                        Conectar Google
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

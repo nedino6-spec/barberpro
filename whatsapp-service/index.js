@@ -10,6 +10,9 @@ const pino = require('pino');
 const { PrismaClient } = require('@prisma/client');
 const usePrismaAuthState = require('./prisma-auth');
 
+// Inicializa o Worker do Google Sync em Background
+require('./worker');
+
 const prisma = new PrismaClient();
 
 const app = express();

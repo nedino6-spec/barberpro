@@ -65,7 +65,10 @@ export async function POST(request: Request) {
               { endTime: { gte: data.endTime } }
             ]
           }
-        ]
+        ],
+        status: {
+          not: "CANCELLED"
+        }
       }
     });
 
@@ -75,20 +78,28 @@ export async function POST(request: Request) {
 
     const appointment = await prisma.appointment.create({
       data: {
-        customerId: data.customerId,
-        barberId: data.barberId,
-        serviceId: data.serviceId,
         date: new Date(data.date),
         startTime: data.startTime,
         endTime: data.endTime,
-        status: 'CONFIRMED'
+        customerId: data.customerId,
+        barberId: data.barberId,
+        serviceId: data.serviceId,
+        status: "PENDING",
       },
       include: {
         customer: true,
         barber: true,
-        service: true
+        service: true,
       }
     });
+
+    // Enfileira o job para sincronizar com o Google Calendar
+    try {
+      const { enqueueSystemToGoogleJob } = require('@/lib/queue/google-sync');
+      await enqueueSystemToGoogleJob(appointment.id, "CREATE");
+    } catch (qErr) {
+      console.error("Erro ao enfileirar job do Google:", qErr);
+    }
 
     // Disparo de Mensagem no WhatsApp
     try {

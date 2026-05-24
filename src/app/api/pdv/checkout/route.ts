@@ -80,9 +80,24 @@ export async function POST(request: Request) {
           }
         }
       }
+
+      // 2. Marcar Itens e Agendamentos
+      for (const item of items) {
+        if (item.type === "APPOINTMENT") {
+          await tx.appointment.update({
+            where: { id: item.id },
+            data: { status: "COMPLETED" }
+          });
+          
+          try {
+            const { enqueueSystemToGoogleJob } = require('@/lib/queue/google-sync');
+            await enqueueSystemToGoogleJob(item.id, "UPDATE");
+          } catch(e) {}
+        }
+      }
     });
 
-    return NextResponse.json({ success: true, message: "Venda concluída com sucesso!" }, { status: 201 });
+    return NextResponse.json({ message: "Checkout finalizado com sucesso." }, { status: 200 });
   } catch (error) {
     console.error("Erro no checkout PDV:", error);
     return NextResponse.json({ error: "Erro interno ao processar venda" }, { status: 500 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, User, CalendarIcon, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, User, CalendarIcon, Plus, Clock } from "lucide-react";
 import AppointmentModal from "@/components/AppointmentModal";
 
 // Helper para gerar horários de meia em meia hora
