@@ -41,19 +41,26 @@ model Tenant {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  name          String
-  email         String    @unique
-  passwordHash  String
-  role          String    @default("BARBER") // ADMIN, MANAGER, BARBER, RECEPTIONIST
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String?  // Hash usando bcrypt
+  phone     String?
+  role      String   @default("BARBER") // "ADMIN", "BARBER", "GERENTE"
+  avatar    String?  // URL do Supabase
+  specialty String?  // Especialidade (ex: Fade, Barba)
+  startTime String?  // Horário início (ex: "09:00")
+  endTime   String?  // Horário fim (ex: "18:00")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  
+  appointments  Appointment[] @relation("BarberAppointments")
   
   tenantId String?
   tenant Tenant? @relation(fields: [tenantId], references: [id])
   
-  appointments  Appointment[] @relation("BarberAppointments")
-  commissions   Finance[]     @relation("BarberCommissions")
+  // Comissões (Recebimentos do barbeiro)
+  commissions       Finance[] @relation("BarberCommissions")
   queueItems    QueueManager[] @relation("BarberQueue")
   cashRegisters CashRegister[] @relation("UserCashRegisters")
   googleIntegration GoogleIntegration?
@@ -63,6 +70,7 @@ model Customer {
   id            String    @id @default(uuid())
   name          String
   phone         String    @unique
+  photo         String?   // URL do Supabase
   preferences   String?
   totalVisits   Int       @default(0)
   lastVisit     DateTime?
