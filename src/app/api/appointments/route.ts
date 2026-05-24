@@ -101,17 +101,28 @@ export async function POST(request: Request) {
       console.error("Erro ao enfileirar job do Google:", qErr);
     }
 
-    // Disparo de Mensagem no WhatsApp
+    // Disparo de Mensagem no WhatsApp e WebSocket (Sincronização Rápida)
     try {
+      const botUrl = process.env.NEXT_PUBLIC_BOT_URL || "http://localhost:3001";
+      
       const message = `Olá, ${appointment.customer.name}! Seu agendamento na BarberPro está CONFIRMADO para o dia ${appointment.date.toLocaleDateString('pt-BR')} às ${appointment.startTime}. Serviço: ${appointment.service.name} com ${appointment.barber.name}. Te esperamos! ✂️`;
       
-      await fetch('http://localhost:3001/send', {
+      // WhatsApp Notification
+      await fetch(`${botUrl}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number: appointment.customer.phone, message })
-      });
+        body: JSON.stringify({ phone: appointment.customer.phone, message })
+      }).catch(e => console.error("Falha ao enviar msg bot", e));
+
+      // Broadcast Real-time WebSocket
+      await fetch(`${botUrl}/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: "NOVO_AGENDAMENTO", data: { id: appointment.id } })
+      }).catch(e => console.error("Falha no broadcast WS", e));
+
     } catch (e) {
-      console.error("Erro ao notificar WhatsApp interno:", e);
+      console.error("Erro na comunicação com o Bot:", e);
     }
 
     return NextResponse.json(appointment, { status: 201 });

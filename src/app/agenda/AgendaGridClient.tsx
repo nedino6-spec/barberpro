@@ -29,13 +29,14 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
 
   const dateStr = currentDate.toISOString().split('T')[0];
   
-  // Cache de Agendamentos (React Query)
+  // Cache de Agendamentos (React Query) com Fallback Rápido
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments', dateStr],
     queryFn: async () => {
       const { data } = await api.get(`/appointments?date=${dateStr}`);
       return data;
-    }
+    },
+    refetchInterval: 5000, // Atualiza a cada 5s caso o WebSocket falhe
   });
 
   // Busca Inteligência Artificial para Sugestão de Horários (1º Barbeiro como padrão)
