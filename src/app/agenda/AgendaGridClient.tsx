@@ -211,7 +211,7 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
           queryClient.invalidateQueries({ queryKey: ['appointments', dateStr] });
           setIsModalOpen(false);
         }}
-        initialData={selectedSlot ? { date: dateStr, startTime: selectedSlot.time, barberId: selectedSlot.barberId } : undefined}
+        initialSlot={selectedSlot ? { date: dateStr, time: selectedSlot.time, barberId: selectedSlot.barberId } : undefined}
       />
     </div>
   );
