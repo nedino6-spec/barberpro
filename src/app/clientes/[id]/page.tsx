@@ -301,6 +301,7 @@ export default function ClientePerfilPage(props: { params: Promise<{ id: string 
           </div>
 
           {/* Area de Risco */}
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
             <h2 className="font-bold text-lg border-b border-danger/20 pb-3 mb-4 text-danger flex items-center gap-2">
               <Ban className="w-5 h-5" /> Área de Risco
             </h2>

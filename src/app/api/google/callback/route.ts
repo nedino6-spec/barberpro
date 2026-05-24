@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTokensFromCode, getCalendarClient } from "@/lib/google-calendar";
-import prisma from "@/lib/prisma";
-import { v4 as uuidv4 } from "uuid";
+import { prisma } from "@/lib/prisma";
+// uuid removido em favor de crypto.randomUUID
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     // Registra Webhook para Push Notifications
     try {
       const calendar = getCalendarClient(tokens.access_token, tokens.refresh_token);
-      const channelId = uuidv4();
+      const channelId = crypto.randomUUID();
       
       const watchResponse = await calendar.events.watch({
         calendarId: "primary",

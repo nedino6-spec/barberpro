@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 // Vamos usar uma função de queue aqui (a ser criada)
 import { enqueueGoogleSyncJob } from "@/lib/queue/google-sync";
 
