@@ -1,205 +1,203 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, User, CalendarIcon, Plus, Clock } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Sparkles, Clock } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/axios";
+import { initSocketClient } from "@/lib/socket";
 import AppointmentModal from "@/components/AppointmentModal";
+import { motion } from "framer-motion";
 
-// Helper para gerar horários de meia em meia hora
-function generateTimeSlots(openTime = "08:00", closeTime = "20:00") {
+// Gera os blocos de horário uma única vez para performance
+const TIME_SLOTS = (() => {
   const slots = [];
-  let [h, m] = openTime.split(":").map(Number);
-  const [endH, endM] = closeTime.split(":").map(Number);
-
-  while (h < endH || (h === endH && m <= endM)) {
-    const hh = String(h).padStart(2, '0');
-    const mm = String(m).padStart(2, '0');
-    slots.push(`${hh}:${mm}`);
+  let [h, m] = [8, 0];
+  while (h < 21 || (h === 21 && m === 0)) {
+    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     m += 30;
-    if (m >= 60) {
-      h += 1;
-      m -= 60;
-    }
+    if (m >= 60) { h += 1; m -= 60; }
   }
   return slots;
-}
+})();
 
 export default function AgendaGridClient({ barbers, customers, services }: any) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   
-  // Para modal pré-preenchido
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ time: string, barberId: string } | null>(null);
 
-  const timeSlots = generateTimeSlots("08:00", "21:00"); // Em breve puxaremos de BusinessHours
-
-  const fetchAppointments = async (date: Date) => {
-    setLoading(true);
-    try {
-      const dateStr = date.toISOString().split('T')[0];
-      const res = await fetch(`/api/appointments?date=${dateStr}`);
-      const data = await res.json();
-      setAppointments(data);
-    } finally {
-      setLoading(false);
+  const dateStr = currentDate.toISOString().split('T')[0];
+  
+  // Cache de Agendamentos (React Query)
+  const { data: appointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', dateStr],
+    queryFn: async () => {
+      const { data } = await api.get(`/appointments?date=${dateStr}`);
+      return data;
     }
-  };
-
-  useEffect(() => {
-    fetchAppointments(currentDate);
-  }, [currentDate]);
-
-  const changeDate = (days: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + days);
-    setCurrentDate(newDate);
-  };
-
-  const formattedDate = currentDate.toLocaleDateString("pt-BR", {
-    weekday: 'long', day: 'numeric', month: 'short'
   });
 
-  const handleSlotClick = (time: string, barberId: string) => {
-    setSelectedSlot({ time, barberId });
-    setIsModalOpen(true);
-  };
+  // Busca Inteligência Artificial para Sugestão de Horários (1º Barbeiro como padrão)
+  const defaultBarberId = barbers[0]?.id;
+  const { data: aiData } = useQuery({
+    queryKey: ['ai-suggestion', dateStr, defaultBarberId],
+    queryFn: async () => {
+      if (!defaultBarberId) return null;
+      const { data } = await api.get(`/ai/suggest-time?date=${dateStr}&barberId=${defaultBarberId}`);
+      return data;
+    },
+    enabled: !!defaultBarberId && !isLoading && appointments.length > 0,
+  });
 
-  // Helper para posicionar os blocos
-  const getAppointmentStyle = (app: any) => {
-    // Calcula o índice de início
-    const startIndex = timeSlots.indexOf(app.startTime);
-    // Para simplificar, assumimos blocos de 30 mins
-    const durationBlocks = Math.ceil(app.service.durationMinutes / 30) || 1;
-    
-    // Altura base = 60px por slot
-    const top = startIndex * 60;
-    const height = durationBlocks * 60;
+  // WebSockets para sincronização Instantânea
+  useEffect(() => {
+    const socket = initSocketClient("default_tenant");
+    const onNewAppointment = () => queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    socket.on("NOVO_AGENDAMENTO", onNewAppointment);
+    return () => { socket.off("NOVO_AGENDAMENTO", onNewAppointment); };
+  }, [queryClient]);
 
-    let bgClass = "bg-warning/20 border-warning text-warning-dark"; // PENDING
-    if (app.status === "CONFIRMED") bgClass = "bg-primary/20 border-primary text-primary-dark";
-    if (app.status === "COMPLETED") bgClass = "bg-success/20 border-success text-success-dark";
-
-    return {
-      top: `${top}px`,
-      height: `${height}px`,
-      className: `absolute left-1 right-1 rounded-xl p-2 text-xs border-l-4 shadow-sm z-10 cursor-pointer overflow-hidden transition-all hover:brightness-95 ${bgClass}`
-    };
-  };
-
-  return (
-    <div className="flex flex-col gap-6">
-      
-      {/* Date Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-card border border-border rounded-2xl p-4 shadow-sm gap-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => changeDate(-1)} className="p-2 bg-background border border-border rounded-full hover:bg-bg-tertiary transition-all active:scale-95 text-foreground">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="flex flex-col items-center min-w-[150px]">
-            <h2 className="font-bold text-lg text-foreground capitalize">{formattedDate}</h2>
+  // Memoização para evitar re-render pesado da Grid
+  const gridContent = useMemo(() => {
+    return barbers.map((barber: any) => (
+      <div key={barber.id} className="flex-1 border-r border-border min-w-[250px] bg-background">
+        <div className="h-16 border-b border-border bg-card sticky top-0 z-20 flex flex-col items-center justify-center gap-1 shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
+              {barber.name.charAt(0)}
+            </div>
+            <span className="font-bold text-sm truncate max-w-[150px]">{barber.name}</span>
           </div>
-          <button onClick={() => changeDate(1)} className="p-2 bg-background border border-border rounded-full hover:bg-bg-tertiary transition-all active:scale-95 text-foreground">
-            <ChevronRight className="w-5 h-5" />
-          </button>
         </div>
 
-        <button onClick={() => { setSelectedSlot(null); setIsModalOpen(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-glow hover:bg-primary-hover transition-all active:scale-95">
-          <Plus className="w-4 h-4" /> Novo Agendamento
-        </button>
+        <div className="relative">
+          {TIME_SLOTS.map((time) => {
+            const apts = appointments.filter((a: any) => a.barberId === barber.id && a.startTime === time);
+
+            return (
+              <div key={`${barber.id}-${time}`} className="h-20 border-b border-border/30 relative group transition-colors hover:bg-bg-tertiary">
+                <button 
+                  onClick={() => { setSelectedSlot({ time, barberId: barber.id }); setIsModalOpen(true); }}
+                  className="absolute inset-0 w-full h-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                >
+                  <div className="bg-primary text-white rounded-full p-2 shadow-glow scale-75 group-hover:scale-100 transition-transform">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                </button>
+
+                {apts.map((apt: any) => {
+                  const startMins = parseInt(apt.startTime.split(':')[0]) * 60 + parseInt(apt.startTime.split(':')[1]);
+                  const endMins = parseInt(apt.endTime.split(':')[0]) * 60 + parseInt(apt.endTime.split(':')[1]);
+                  const height = ((endMins - startMins) / 30) * 80;
+                  
+                  let bgClass = "bg-primary/10 border-primary text-primary";
+                  if (apt.status === "COMPLETED") bgClass = "bg-green-500/10 border-green-500 text-green-500";
+                  if (apt.status === "CANCELLED") bgClass = "bg-red-500/10 border-red-500 text-red-500";
+
+                  return (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                      key={apt.id} 
+                      className={`absolute top-0 left-1 right-1 z-10 rounded-lg border-l-4 p-2 overflow-hidden shadow-sm backdrop-blur-md ${bgClass} flex flex-col justify-between`}
+                      style={{ height: `${height - 4}px` }}
+                    >
+                      <div>
+                        <div className="text-xs font-bold truncate leading-tight">{apt.customer.name}</div>
+                        <div className="text-[10px] opacity-80 truncate leading-tight">{apt.service.name}</div>
+                      </div>
+                      <div className="text-[10px] flex items-center gap-1 opacity-70">
+                        <Clock className="w-3 h-3" /> {apt.startTime} - {apt.endTime}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ));
+  }, [appointments, barbers]);
+
+  const changeDate = (days: number) => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + days);
+    setCurrentDate(d);
+  };
+
+  const formattedDate = currentDate.toLocaleDateString("pt-BR", { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
+
+  return (
+    <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden flex flex-col h-[calc(100vh-140px)]">
+      {/* Header */}
+      <div className="p-4 md:p-6 border-b border-border bg-bg-tertiary flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary/20 text-primary rounded-xl">
+            <CalendarIcon className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Agenda Inteligente</h1>
+            <p className="text-muted-foreground text-sm flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Sincronizado ao Vivo
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 bg-background p-1.5 rounded-xl border border-border">
+          <button onClick={() => changeDate(-1)} className="p-2 hover:bg-bg-tertiary rounded-lg transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+          <div className="font-bold min-w-[140px] text-center text-sm md:text-base">{formattedDate}</div>
+          <button onClick={() => changeDate(1)} className="p-2 hover:bg-bg-tertiary rounded-lg transition-colors"><ChevronRight className="w-5 h-5" /></button>
+        </div>
       </div>
 
+      {aiData?.suggestion && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-primary/10 border-b border-primary/20 px-6 py-3 flex items-center justify-between text-sm text-primary font-medium">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 animate-pulse" />
+            Sugestão da IA para {barbers[0]?.name}: {aiData.suggestion} é o horário com maior probabilidade de ser preenchido.
+          </div>
+          <button 
+            onClick={() => { setSelectedSlot({ time: aiData.suggestion, barberId: defaultBarberId }); setIsModalOpen(true); }}
+            className="px-3 py-1 bg-primary text-white rounded shadow-glow text-xs"
+          >
+            Auto Encaixe
+          </button>
+        </motion.div>
+      )}
+
       {/* Grid */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col relative">
-        {loading && (
-          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="animate-pulse font-bold text-muted-foreground">Carregando agenda...</div>
+      <div className="flex-1 overflow-auto relative custom-scrollbar">
+        {isLoading && (
+          <div className="absolute inset-0 z-50 bg-background/50 backdrop-blur-sm flex items-center justify-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
 
-        {/* Header Barbers */}
-        <div className="flex border-b border-border bg-bg-tertiary/50">
-          <div className="w-[70px] shrink-0 border-r border-border flex items-center justify-center">
-            <Clock className="w-4 h-4 text-muted-foreground opacity-50" />
-          </div>
-          <div className="flex flex-1">
-            {barbers.map((barber: any) => (
-              <div key={barber.id} className="flex-1 text-center py-3 border-r border-border last:border-r-0">
-                <div className="font-bold text-sm text-foreground flex items-center justify-center gap-2">
-                  <User className="w-4 h-4 text-primary" /> {barber.name}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Body Grid */}
-        <div className="flex relative h-[600px] overflow-y-auto">
-          
-          {/* Times Column */}
-          <div className="w-[70px] shrink-0 border-r border-border bg-background">
-            {timeSlots.map((time, idx) => (
-              <div key={idx} className="h-[60px] flex items-start justify-center pt-2 border-b border-border/50 text-xs font-bold text-muted-foreground">
+        <div className="min-w-[800px] flex">
+          <div className="w-24 flex-shrink-0 border-r border-border bg-bg-tertiary sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+            <div className="h-16 border-b border-border"></div>
+            {TIME_SLOTS.map((time) => (
+              <div key={time} className="h-20 border-b border-border/50 flex flex-col items-center justify-start py-2 text-xs font-medium text-muted-foreground">
                 {time}
               </div>
             ))}
           </div>
-
-          {/* Barbers Columns */}
-          <div className="flex flex-1 relative bg-background">
-            {/* Linhas horizontais de grade */}
-            <div className="absolute inset-0 pointer-events-none">
-              {timeSlots.map((_, idx) => (
-                <div key={idx} className="h-[60px] border-b border-border/50 w-full"></div>
-              ))}
-            </div>
-
-            {/* Colunas verticais */}
-            {barbers.map((barber: any) => {
-              const barberAppointments = appointments.filter(a => a.barberId === barber.id);
-
-              return (
-                <div key={barber.id} className="flex-1 relative border-r border-border last:border-r-0">
-                  {/* Slots clicáveis (vazios) */}
-                  {timeSlots.map((time, idx) => (
-                    <div 
-                      key={idx} 
-                      className="absolute w-full h-[60px] hover:bg-primary/5 cursor-pointer z-0 transition-colors"
-                      style={{ top: `${idx * 60}px` }}
-                      onClick={() => handleSlotClick(time, barber.id)}
-                    ></div>
-                  ))}
-
-                  {/* Blocos de Agendamentos */}
-                  {barberAppointments.map(app => {
-                    const style = getAppointmentStyle(app);
-                    return (
-                      <div key={app.id} className={style.className} style={{ top: style.top, height: style.height }}>
-                        <div className="font-bold truncate">{app.customer.name}</div>
-                        <div className="truncate opacity-80 mt-0.5">{app.service.name}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-
+          {gridContent}
         </div>
       </div>
 
-      {/* Reutilizando Modal Atual */}
       <AppointmentModal 
-        customers={customers} 
-        barbers={barbers} 
-        services={services} 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        initialSlot={selectedSlot}
+        customers={customers}
+        barbers={barbers}
+        services={services}
         onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['appointments', dateStr] });
           setIsModalOpen(false);
-          fetchAppointments(currentDate);
         }}
+        initialData={selectedSlot ? { date: dateStr, startTime: selectedSlot.time, barberId: selectedSlot.barberId } : undefined}
       />
     </div>
   );

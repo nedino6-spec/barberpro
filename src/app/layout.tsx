@@ -4,6 +4,7 @@ import "./globals.css";
 import { BottomTabs } from "@/components/ui/BottomTabs";
 import { Bell, User } from "lucide-react";
 import Link from "next/link";
+import Providers from "@/components/providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -34,10 +35,11 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${inter.className} bg-background text-foreground overflow-hidden`}>
-        <div className="flex h-screen w-full">
-          {/* Sidebar (Desktop) */}
-          <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border p-6 h-full">
-            <div className="text-2xl font-bold text-white mb-8 flex items-center gap-2">
+        <Providers>
+          <div className="flex h-screen w-full">
+            {/* Sidebar (Desktop) */}
+            <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border p-6 h-full">
+              <div className="text-2xl font-bold text-white mb-8 flex items-center gap-2">
               ✂️ <span className="text-primary">BarberPro</span>
             </div>
             
@@ -92,8 +94,9 @@ export default function RootLayout({
 
             {/* Mobile Bottom Navigation */}
             <BottomTabs />
+            </div>
           </div>
-        </div>
+        </Providers>
       </body>
     </html>
   );

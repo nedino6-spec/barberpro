@@ -16,10 +16,11 @@ require('./worker');
 const prisma = new PrismaClient();
 
 const app = express();
+const server = http.createServer(app);
+
 app.use(cors());
 app.use(express.json());
 
-const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
 const API_BASE_URL = 'https://barberpro-tau.vercel.app/api/bot';
@@ -210,8 +211,16 @@ app.get('/status', (req, res) => {
   });
 });
 
-// Rota para enviar mensagens avulsas (Alerta de fila)
-app.post('/api/send-alert', async (req, res) => {
+// ======== ENDPOINTS DO BOT ======== //
+
+app.post('/broadcast', (req, res) => {
+  const { event, data } = req.body;
+  if (!event) return res.status(400).json({ error: "event is required" });
+  io.emit(event, data);
+  res.json({ success: true, event });
+});
+
+app.post('/send', async (req, res) => {
   try {
     const { phone, message } = req.body;
     if (!phone || !message) return res.status(400).json({ error: 'Número e mensagem são obrigatórios' });
