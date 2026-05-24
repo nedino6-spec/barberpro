@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const express = require('express');
 const cors = require('cors');
@@ -7,6 +7,10 @@ const { Server } = require('socket.io');
 const QRCode = require('qrcode');
 const path = require('path');
 const pino = require('pino');
+const { PrismaClient } = require('@prisma/client');
+const usePrismaAuthState = require('./prisma-auth');
+
+const prisma = new PrismaClient();
 
 const app = express();
 app.use(cors());
@@ -26,11 +30,10 @@ function updateState(newState) {
   io.emit('status_update', state);
 }
 
-const SESSION_DIR = process.env.SESSION_PATH || path.join('/tmp', 'baileys_auth');
 const userSessions = {};
 
 async function startBot() {
-  const { state: authState, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
+  const { state: authState, saveCreds } = await usePrismaAuthState(prisma);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
