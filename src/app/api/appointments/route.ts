@@ -114,11 +114,11 @@ export async function POST(request: Request) {
         body: JSON.stringify({ phone: appointment.customer.phone, message })
       }).catch(e => console.error("Falha ao enviar msg bot", e));
 
-      // Broadcast Real-time WebSocket
+      // Broadcast Real-time WebSocket (Envia o objeto COMPLETO para evitar que os clientes precisem refetch)
       await fetch(`${botUrl}/broadcast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: "NOVO_AGENDAMENTO", data: { id: appointment.id } })
+        body: JSON.stringify({ event: "NOVO_AGENDAMENTO", data: { appointment } })
       }).catch(e => console.error("Falha no broadcast WS", e));
 
     } catch (e) {

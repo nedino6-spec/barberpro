@@ -54,7 +54,20 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
   // WebSockets para sincronização Instantânea
   useEffect(() => {
     const socket = initSocketClient("default_tenant");
-    const onNewAppointment = () => queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    const onNewAppointment = (payload: any) => {
+      // Injeta no cache nativamente (Atualização Instantânea = 0ms)
+      if (payload?.appointment) {
+        const aptDate = new Date(payload.appointment.date).toISOString().split('T')[0];
+        queryClient.setQueryData(['appointments', aptDate], (old: any) => {
+          if (!old) return [payload.appointment];
+          // Evita duplicidade se já existir
+          if (old.some((apt: any) => apt.id === payload.appointment.id)) return old;
+          return [...old, payload.appointment];
+        });
+      }
+      // Invalida em background por segurança
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    };
     socket.on("NOVO_AGENDAMENTO", onNewAppointment);
     return () => { socket.off("NOVO_AGENDAMENTO", onNewAppointment); };
   }, [queryClient]);
