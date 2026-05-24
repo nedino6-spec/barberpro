@@ -13,11 +13,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY prisma ./prisma
-RUN npx prisma generate
 COPY . .
+RUN npm install
+RUN npx prisma generate --schema=frontend/prisma/schema.prisma
 
 # Inicia o bot
 CMD ["node", "whatsapp-service/index.js"]
