@@ -1,0 +1,17 @@
+{
+  "node": {
+    "40827e898248e8847d2ab0575feffc455399251de4": {
+      "workers": {
+        "app/agenda/page": {
+          "moduleId": 64675,
+          "async": false,
+          "exportedName": "createAppointment",
+          "filename": "frontend/src/app/actions.ts"
+        }
+      },
+      "exportedName": "createAppointment",
+      "filename": "frontend/src/app/actions.ts"
+    }
+  },
+  "edge": {}
+}

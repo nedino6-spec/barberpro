@@ -1,0 +1,17 @@
+{
+  "node": {
+    "404cbe3e2c37905d0854ce459f8a12edf656ee3e5f": {
+      "workers": {
+        "app/clientes/page": {
+          "moduleId": 3884,
+          "async": false,
+          "exportedName": "createCustomer",
+          "filename": "frontend/src/app/actions.ts"
+        }
+      },
+      "exportedName": "createCustomer",
+      "filename": "frontend/src/app/actions.ts"
+    }
+  },
+  "edge": {}
+}

@@ -1,0 +1,29 @@
+{
+  "node": {
+    "408fc07b043080a0372c911b1a68436a20ee6cdd22": {
+      "workers": {
+        "app/servicos/page": {
+          "moduleId": 84231,
+          "async": false,
+          "exportedName": "saveService",
+          "filename": "frontend/src/app/actions.ts"
+        }
+      },
+      "exportedName": "saveService",
+      "filename": "frontend/src/app/actions.ts"
+    },
+    "6071c39c6e1bb667a389ba97127babdb0fb3181125": {
+      "workers": {
+        "app/servicos/page": {
+          "moduleId": 84231,
+          "async": false,
+          "exportedName": "toggleServiceStatus",
+          "filename": "frontend/src/app/actions.ts"
+        }
+      },
+      "exportedName": "toggleServiceStatus",
+      "filename": "frontend/src/app/actions.ts"
+    }
+  },
+  "edge": {}
+}
