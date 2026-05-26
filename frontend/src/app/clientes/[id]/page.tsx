@@ -108,58 +108,58 @@ export default function ClientePerfilPage(props: { params: Promise<{ id: string 
         
         {/* Coluna Esquerda - Formulario Principal */}
         <div className="md:col-span-2 flex flex-col gap-6">
-          <form onSubmit={handleSave} className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col gap-4">
-            <h2 className="font-bold text-lg border-b border-border pb-3 flex items-center gap-2">
-              <UserCircle2 className="w-5 h-5 text-primary" /> Dados Pessoais
+          <form onSubmit={handleSave} className="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+            <h2 className="font-bold text-lg border-b border-white/10 pb-3 flex items-center gap-2 text-white">
+              <UserCircle2 className="w-5 h-5 text-blue-400" /> Dados Pessoais
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nome Completo</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nome Completo</label>
                 <input 
                   type="text" 
                   value={name} 
                   onChange={e => setName(e.target.value)}
-                  className="w-full mt-1 bg-background border border-border rounded-xl px-4 py-2.5 outline-none focus:border-primary font-medium" 
+                  className="input font-medium" 
                 />
               </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Celular (WhatsApp)</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Celular (WhatsApp)</label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input 
                     type="text" 
                     value={phone} 
                     onChange={e => setPhone(e.target.value)}
-                    className="w-full mt-1 bg-background border border-border rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-primary font-medium" 
+                    className="input pl-10 font-medium" 
                   />
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <div className="flex flex-col gap-1.5 mt-2">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                 Notas Internas (Secretas)
               </label>
               <textarea 
                 value={notes} 
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Ex: Cliente prefere máquina 2 na lateral, gosta de café sem açúcar..."
-                className="w-full mt-1 bg-background/50 border border-border rounded-xl px-4 py-3 outline-none focus:border-warning min-h-[120px] text-sm resize-none" 
+                className="input min-h-[120px] text-sm resize-none" 
               />
-              <p className="text-[11px] text-muted-foreground mt-1">O cliente nunca verá essas anotações.</p>
+              <p className="text-[11px] text-slate-500 mt-1">O cliente nunca verá essas anotações.</p>
             </div>
 
-            <div className="flex justify-end mt-2">
-              <button disabled={saving} type="submit" className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-6 py-2.5 rounded-xl font-bold shadow-glow transition-all active:scale-95 disabled:opacity-50">
-                <Save className="w-4 h-4" /> {saving ? "Salvando..." : "Salvar Alteraçoes"}
+            <div className="flex justify-end mt-4 pt-4 border-t border-white/10">
+              <button disabled={saving} type="submit" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all active:scale-95 border-t border-blue-400/30 disabled:opacity-50">
+                <Save className="w-4 h-4" /> {saving ? "Salvando..." : "Salvar Alterações"}
               </button>
             </div>
           </form>
 
           {/* Histórico Recente */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold text-lg border-b border-border pb-3 flex items-center gap-2 mb-4">
+          <div className="glass-panel rounded-2xl p-6">
+            <h2 className="font-bold text-lg border-b border-white/10 pb-3 flex items-center gap-2 mb-4 text-white">
               <Clock className="w-5 h-5 text-primary" /> Últimas Passagens (Fila/Agenda)
             </h2>
             {customer.appointments && customer.appointments.length > 0 ? (

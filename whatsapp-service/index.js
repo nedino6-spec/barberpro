@@ -25,7 +25,7 @@ app.use(express.json());
 
 const io = new Server(server, { cors: { origin: '*' } });
 
-const API_BASE_URL = 'https://barberpro-tau.vercel.app/api/bot';
+const API_BASE_URL = process.env.BACKEND_API_URL || 'http://localhost:3001/api/bot';
 
 let state = { status: 'STARTING', qr: null, qrImage: null };
 let globalSock = null; // Referência global para enviar mensagens pela API externa
@@ -222,9 +222,23 @@ async function startBot() {
         continue;
       }
 
-      // Resposta padrão
+      // Resposta padrão (Inteligência Artificial)
       if (text.length > 0) {
-        await send(`Olá! Digite *menu* para ver como posso te ajudar. ✂️`);
+        try {
+          const res = await fetch(`${API_BASE_URL}/ai-chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phoneOnly, message: text }),
+          });
+          const data = await res.json();
+          if (data.reply) {
+            await send(data.reply);
+          } else {
+            await send(`Olá! Digite *menu* para ver como posso te ajudar. ✂️`);
+          }
+        } catch (e) {
+          await send(`Olá! Digite *menu* para ver como posso te ajudar. ✂️`);
+        }
       }
     }
   });

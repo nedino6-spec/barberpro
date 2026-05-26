@@ -1,132 +1,72 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const dateStr = searchParams.get("date"); // YYYY-MM-DD
-    
-    let whereClause = {};
-    
-    if (dateStr) {
-      // Filtrar apenas o dia selecionado (00:00:00 até 23:59:59)
-      const startDate = new Date(`${dateStr}T00:00:00.000Z`);
-      const endDate = new Date(`${dateStr}T23:59:59.999Z`);
-      whereClause = {
-        date: {
-          gte: startDate,
-          lte: endDate,
-        }
-      };
+    const searchParams = request.nextUrl.searchParams;
+    const dateStr = searchParams.get("date");
+
+    if (!dateStr) {
+      return NextResponse.json({ error: "Data é obrigatória" }, { status: 400 });
     }
 
+    // Busca agendamentos do dia específico
+    const startOfDay = new Date(dateStr + "T00:00:00.000Z");
+    const endOfDay = new Date(dateStr + "T23:59:59.999Z");
+
     const appointments = await prisma.appointment.findMany({
-      where: whereClause,
+      where: {
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
       include: {
         customer: true,
-        barber: true,
         service: true,
+        barber: true,
       },
       orderBy: {
         startTime: 'asc',
-      },
-    });
-    
-    return NextResponse.json(appointments);
-  } catch (error) {
-    return NextResponse.json({ error: 'Erro ao buscar agendamentos' }, { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const data = await request.json();
-    
-    // Validate required fields
-    if (!data.customerId || !data.barberId || !data.serviceId || !data.date || !data.startTime || !data.endTime) {
-      return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 });
-    }
-
-    // Check for conflicting appointments
-    const conflict = await prisma.appointment.findFirst({
-      where: {
-        barberId: data.barberId,
-        date: new Date(data.date),
-        OR: [
-          {
-            AND: [
-              { startTime: { lte: data.startTime } },
-              { endTime: { gt: data.startTime } }
-            ]
-          },
-          {
-            AND: [
-              { startTime: { lt: data.endTime } },
-              { endTime: { gte: data.endTime } }
-            ]
-          }
-        ],
-        status: {
-          not: "CANCELLED"
-        }
       }
     });
 
-    if (conflict) {
-      return NextResponse.json({ error: 'Horário indisponível para este barbeiro' }, { status: 409 });
+    return NextResponse.json(appointments);
+  } catch (error) {
+    console.error("Erro ao buscar agendamentos:", error);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const { customerId, barberId, serviceId, date, startTime, endTime } = data;
+
+    if (!customerId || !barberId || !serviceId || !date || !startTime || !endTime) {
+      return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
     }
 
     const appointment = await prisma.appointment.create({
       data: {
-        date: new Date(data.date),
-        startTime: data.startTime,
-        endTime: data.endTime,
-        customerId: data.customerId,
-        barberId: data.barberId,
-        serviceId: data.serviceId,
+        date: new Date(date + "T12:00:00.000Z"),
+        startTime,
+        endTime,
         status: "PENDING",
+        customer: { connect: { id: customerId } },
+        barber: { connect: { id: barberId } },
+        service: { connect: { id: serviceId } }
       },
       include: {
         customer: true,
-        barber: true,
         service: true,
+        barber: true
       }
     });
 
-    // Enfileira o job para sincronizar com o Google Calendar
-    try {
-      const { enqueueSystemToGoogleJob } = require('@/lib/queue/google-sync');
-      await enqueueSystemToGoogleJob(appointment.id, "CREATE");
-    } catch (qErr) {
-      console.error("Erro ao enfileirar job do Google:", qErr);
-    }
-
-    // Disparo de Mensagem no WhatsApp e WebSocket (Sincronização Rápida)
-    try {
-      const botUrl = process.env.NEXT_PUBLIC_BOT_URL || "http://localhost:3001";
-      
-      const message = `Olá, ${appointment.customer.name}! Seu agendamento na BarberPro está CONFIRMADO para o dia ${appointment.date.toLocaleDateString('pt-BR')} às ${appointment.startTime}. Serviço: ${appointment.service.name} com ${appointment.barber.name}. Te esperamos! ✂️`;
-      
-      // WhatsApp Notification
-      await fetch(`${botUrl}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: appointment.customer.phone, message })
-      }).catch(e => console.error("Falha ao enviar msg bot", e));
-
-      // Broadcast Real-time WebSocket (Envia o objeto COMPLETO para evitar que os clientes precisem refetch)
-      await fetch(`${botUrl}/broadcast`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: "NOVO_AGENDAMENTO", data: { appointment } })
-      }).catch(e => console.error("Falha no broadcast WS", e));
-
-    } catch (e) {
-      console.error("Erro na comunicação com o Bot:", e);
-    }
-
     return NextResponse.json(appointment, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: 'Erro ao criar agendamento' }, { status: 500 });
+    console.error("Erro ao criar agendamento:", error);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

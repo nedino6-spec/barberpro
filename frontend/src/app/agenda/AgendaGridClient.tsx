@@ -26,6 +26,7 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ time: string, barberId: string } | null>(null);
+  const [viewApt, setViewApt] = useState<any>(null); // For viewing an existing appointment
 
   const dateStr = currentDate.toISOString().split('T')[0];
   
@@ -75,13 +76,13 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
   // Memoização para evitar re-render pesado da Grid
   const gridContent = useMemo(() => {
     return barbers.map((barber: any) => (
-      <div key={barber.id} className="flex-1 border-r border-border min-w-[250px] bg-background">
-        <div className="h-16 border-b border-border bg-card sticky top-0 z-20 flex flex-col items-center justify-center gap-1 shadow-sm">
+      <div key={barber.id} className="flex-1 border-r border-white/10 min-w-[250px] bg-slate-900/20 backdrop-blur-md">
+        <div className="h-16 border-b border-white/10 bg-slate-900/60 sticky top-0 z-20 flex flex-col items-center justify-center gap-1 shadow-sm backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
+            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-sm font-bold shadow-[0_0_10px_rgba(37,99,235,0.3)]">
               {barber.name.charAt(0)}
             </div>
-            <span className="font-bold text-sm truncate max-w-[150px]">{barber.name}</span>
+            <span className="font-bold text-sm truncate max-w-[150px] text-white">{barber.name}</span>
           </div>
         </div>
 
@@ -105,15 +106,16 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
                   const endMins = parseInt(apt.endTime.split(':')[0]) * 60 + parseInt(apt.endTime.split(':')[1]);
                   const height = ((endMins - startMins) / 30) * 80;
                   
-                  let bgClass = "bg-primary/10 border-primary text-primary";
-                  if (apt.status === "COMPLETED") bgClass = "bg-green-500/10 border-green-500 text-green-500";
-                  if (apt.status === "CANCELLED") bgClass = "bg-red-500/10 border-red-500 text-red-500";
+                  let bgClass = "bg-blue-500/20 border-blue-500/50 text-blue-100 shadow-[0_0_10px_rgba(59,130,246,0.3)] hover:bg-blue-500/30";
+                  if (apt.status === "COMPLETED") bgClass = "bg-emerald-500/20 border-emerald-500/50 text-emerald-100 shadow-[0_0_10px_rgba(16,185,129,0.3)] hover:bg-emerald-500/30";
+                  if (apt.status === "CANCELLED") bgClass = "bg-rose-500/20 border-rose-500/50 text-rose-100 shadow-[0_0_10px_rgba(244,63,94,0.3)] hover:bg-rose-500/30";
 
                   return (
                     <motion.div 
                       initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
                       key={apt.id} 
-                      className={`absolute top-0 left-1 right-1 z-10 rounded-lg border-l-4 p-2 overflow-hidden shadow-sm backdrop-blur-md ${bgClass} flex flex-col justify-between`}
+                      onClick={() => setViewApt(apt)}
+                      className={`absolute top-0 left-1 right-1 z-10 rounded-lg border-l-4 p-2 overflow-hidden shadow-sm backdrop-blur-md ${bgClass} flex flex-col justify-between cursor-pointer transition-colors`}
                       style={{ height: `${height - 4}px` }}
                     >
                       <div>
@@ -143,9 +145,9 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
   const formattedDate = currentDate.toLocaleDateString("pt-BR", { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
 
   return (
-    <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden flex flex-col h-[calc(100vh-140px)]">
+    <div className="glass-panel border border-white/10 rounded-2xl shadow-xl overflow-hidden flex flex-col h-[calc(100vh-140px)]">
       {/* Header */}
-      <div className="p-4 md:p-6 border-b border-border bg-bg-tertiary flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-4 md:p-6 border-b border-white/10 bg-slate-900/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-primary/20 text-primary rounded-xl">
             <CalendarIcon className="w-6 h-6" />
@@ -158,10 +160,18 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
           </div>
         </div>
 
-        <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 bg-background p-1.5 rounded-xl border border-border">
-          <button onClick={() => changeDate(-1)} className="p-2 hover:bg-bg-tertiary rounded-lg transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-          <div className="font-bold min-w-[140px] text-center text-sm md:text-base">{formattedDate}</div>
-          <button onClick={() => changeDate(1)} className="p-2 hover:bg-bg-tertiary rounded-lg transition-colors"><ChevronRight className="w-5 h-5" /></button>
+        <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 glass-panel p-1.5 rounded-xl border border-white/10">
+          <button onClick={() => changeDate(-1)} className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+          <div className="relative flex items-center justify-center min-w-[150px]">
+            <input 
+              type="date" 
+              value={dateStr}
+              onChange={(e) => setCurrentDate(new Date(e.target.value + "T12:00:00"))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <div className="font-bold text-center text-sm md:text-base text-white">{formattedDate}</div>
+          </div>
+          <button onClick={() => changeDate(1)} className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><ChevronRight className="w-5 h-5" /></button>
         </div>
       </div>
 
@@ -213,6 +223,53 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
         }}
         initialSlot={selectedSlot ? { date: dateStr, time: selectedSlot.time, barberId: selectedSlot.barberId } : undefined}
       />
+
+      {viewApt && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl p-6">
+            <h2 className="text-lg font-bold text-white mb-4">Gerenciar Agendamento</h2>
+            <div className="space-y-2 mb-6">
+              <p className="text-sm text-slate-300"><strong>Cliente:</strong> {viewApt.customer?.name}</p>
+              <p className="text-sm text-slate-300"><strong>Serviço:</strong> {viewApt.service?.name}</p>
+              <p className="text-sm text-slate-300"><strong>Horário:</strong> {viewApt.startTime} às {viewApt.endTime}</p>
+              <p className="text-sm text-slate-300"><strong>Status Atual:</strong> {viewApt.status}</p>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              {viewApt.status === "PENDING" && (
+                <>
+                  <button 
+                    onClick={async () => {
+                      await api.patch(`/appointments/${viewApt.id}`, { status: "COMPLETED" });
+                      queryClient.invalidateQueries({ queryKey: ['appointments', dateStr] });
+                      setViewApt(null);
+                    }}
+                    className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:bg-emerald-500 transition-all border-t border-emerald-400/30"
+                  >
+                    Marcar como Concluído
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      await api.patch(`/appointments/${viewApt.id}`, { status: "CANCELLED" });
+                      queryClient.invalidateQueries({ queryKey: ['appointments', dateStr] });
+                      setViewApt(null);
+                    }}
+                    className="w-full py-2.5 bg-rose-600 text-white rounded-xl font-bold shadow-[0_0_15px_rgba(244,63,94,0.4)] hover:bg-rose-500 transition-all border-t border-rose-400/30"
+                  >
+                    Cancelar Agendamento
+                  </button>
+                </>
+              )}
+              <button 
+                onClick={() => setViewApt(null)}
+                className="w-full py-2.5 bg-slate-800 border border-white/10 text-white rounded-xl font-medium hover:bg-slate-700 transition-colors mt-2"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export async function createCustomer(formData: FormData) {
+export async function saveCustomer(formData: FormData) {
+  const id = formData.get("id") as string | null;
   const name = formData.get("name") as string;
   const phone = formData.get("phone") as string;
 
@@ -11,9 +12,18 @@ export async function createCustomer(formData: FormData) {
     throw new Error("Nome e telefone são obrigatórios");
   }
 
-  await prisma.customer.create({
-    data: { name, phone },
-  });
+  if (id) {
+    // Edição
+    await prisma.customer.update({
+      where: { id },
+      data: { name, phone },
+    });
+  } else {
+    // Criação
+    await prisma.customer.create({
+      data: { name, phone },
+    });
+  }
 
   revalidatePath("/clientes");
   revalidatePath("/agenda");
