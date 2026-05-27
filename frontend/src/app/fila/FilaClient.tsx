@@ -31,6 +31,11 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
   const [showConfig, setShowConfig] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [checkoutData, setCheckoutData] = useState<{isOpen: boolean, customerId: string, customerName: string, queueItemId: string} | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Filter by Barber
   const [selectedBarberId, setSelectedBarberId] = useState<string>("ALL");
@@ -150,6 +155,8 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
     return i.barberId === selectedBarberId || !i.barberId; 
     // Mostrar clientes sem barbeiro definido ou do barbeiro
   });
+
+  if (!isMounted) return null;
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
