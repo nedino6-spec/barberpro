@@ -10,7 +10,7 @@ import { X, UserPlus, Edit2 } from "lucide-react";
 
 const customerSchema = z.object({
   name: z.string().min(3, "O nome deve ter no mínimo 3 caracteres"),
-  phone: z.string().min(10, "O telefone deve ter no mínimo 10 dígitos (Ex: 11999999999)").regex(/^\d+$/, "Apenas números"),
+  phone: z.string().transform(val => val.replace(/\D/g, '')).pipe(z.string().min(10, "O telefone deve ter no mínimo 10 dígitos (Ex: 11999999999)")),
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
