@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const queue = await prisma.queueManager.findMany({
       where: { 
-        status: { in: ["WAITING", "CONFIRMED", "COMMUTING", "NEXT", "IN_PROGRESS"] }
+        status: { in: ["WAITING", "CONFIRMED", "IN_TRANSIT", "NEXT", "IN_PROGRESS"] }
       },
       include: { customer: true, barber: true },
       orderBy: { orderIndex: 'asc' }
@@ -47,24 +47,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 1. Encontrar o tenant e verificar multi-barbeiro
-    // Se o cliente informar um barbeiro, validamos. Se não, entra na fila geral.
-    let targetBarberId = body.barberId || null;
+    const peopleAhead = await prisma.queueManager.count({ where: { status: "WAITING" } });
     
-    // Obter todos na fila para este barbeiro (ou na fila geral se null)
-    const peopleAhead = await prisma.queueManager.count({ 
-      where: { 
-        status: { in: ["WAITING", "CONFIRMED", "COMMUTING", "NEXT", "IN_PROGRESS"] },
-        barberId: targetBarberId 
-      } 
-    });
-
-    let avgWaitTime = 30; // 30 min default
-    if (targetBarberId) {
-       const b = await prisma.user.findUnique({ where: { id: targetBarberId } });
-       if (b && b.averageServiceTimeMins) avgWaitTime = b.averageServiceTimeMins;
-    }
-
     const customer = await prisma.customer.findUnique({ where: { id: customerId } });
     if (customer?.isBlocked) {
       return NextResponse.json({ error: "Cliente bloqueado." }, { status: 400 });
@@ -72,32 +56,33 @@ export async function POST(request: NextRequest) {
     
     // Verifica se já está na fila
     const alreadyInQueue = await prisma.queueManager.findFirst({
-      where: { customerId, status: { in: ["WAITING", "CONFIRMED", "COMMUTING", "NEXT", "IN_PROGRESS"] } }
+      where: { customerId, status: { in: ["WAITING", "CONFIRMED", "IN_TRANSIT", "NEXT", "IN_PROGRESS"] } }
     });
 
     if (alreadyInQueue) {
       return NextResponse.json({ error: "Cliente já está na fila." }, { status: 400 });
     }
 
-    // Calcular orderIndex (maior atual + 1)
-    const lastInQueue = await prisma.queueManager.findFirst({
-      where: { barberId: targetBarberId },
+    // Calcula o orderIndex correto
+    const lastItem = await prisma.queueManager.findFirst({
+      where: { status: { in: ["WAITING", "CONFIRMED", "IN_TRANSIT", "NEXT", "IN_PROGRESS"] } },
       orderBy: { orderIndex: 'desc' }
     });
-    
-    const newOrderIndex = lastInQueue ? lastInQueue.orderIndex + 1 : 1;
+    const nextOrderIndex = lastItem ? lastItem.orderIndex + 1 : 1;
+
+    // Tempo estimado inteligente
+    const avgServiceTime = 30; // 30 min por cliente padrão, idealmente virá do Barber
+    const estimatedWaitMins = peopleAhead * avgServiceTime;
 
     const newItem = await prisma.queueManager.create({
       data: {
         customerId,
-        barberId: targetBarberId,
         position: peopleAhead + 1,
-        orderIndex: newOrderIndex,
-        estimatedWaitMins: (peopleAhead) * avgWaitTime, // Se tem 1 na frente, espera 30min
-        status: "WAITING",
-        joinedAt: new Date()
+        orderIndex: nextOrderIndex,
+        estimatedWaitMins,
+        status: "WAITING"
       },
-      include: { customer: true, barber: true }
+      include: { customer: true }
     });
 
     // Tentar notificar webhook (Bot do WhatsApp) - Opcional e Assíncrono

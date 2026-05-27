@@ -61,7 +61,8 @@ export default function RootLayout({
             </div>
             
             <nav className="flex flex-col gap-2">
-              <Link href="/" className="nav-item active">📊 Dashboard</Link>
+              <Link href="/" className="nav-item active">📊 Visão Geral</Link>
+              <Link href="/dashboard" className="nav-item text-primary font-bold">📈 SaaS Analytics</Link>
               <Link href="/caixa" className="nav-item">💳 Frente de Caixa</Link>
               <Link href="/agenda" className="nav-item">📅 Agenda</Link>
               <Link href="/financeiro" className="nav-item">💰 Financeiro</Link>

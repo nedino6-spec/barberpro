@@ -1,234 +1,292 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Clock, CheckCircle2, Wifi, WifiOff, Settings, ArrowUp, ArrowDown, User as UserIcon } from "lucide-react";
+import { Users, Settings, PauseCircle, Activity, Search } from "lucide-react";
+import { api } from "@/lib/axios";
+import PixCheckoutModal from "@/components/PixCheckoutModal";
 
-let socket: Socket;
+// dnd-kit imports
+import { 
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
-export default function FilaVirtualPage({ 
-  initialQueue, 
-  barbers,
-  queueConfig 
-}: { 
-  initialQueue: any[],
-  barbers: any[],
-  queueConfig: any
-}) {
-  const [queue, setQueue] = useState(initialQueue || []);
-  const [socketConnected, setSocketConnected] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customerIdInput, setCustomerIdInput] = useState("");
-  const [selectedBarber, setSelectedBarber] = useState("");
-  const [isPaused, setIsPaused] = useState(queueConfig.isQueuePaused);
+import { SortableQueueItem } from "./SortableQueueItem";
 
+export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] }) {
+  const queryClient = useQueryClient();
+  const [showConfig, setShowConfig] = useState(false);
+  const [customerId, setCustomerId] = useState("");
+  const [checkoutData, setCheckoutData] = useState<{isOpen: boolean, customerId: string, customerName: string, queueItemId: string} | null>(null);
+  
+  // Filter by Barber
+  const [selectedBarberId, setSelectedBarberId] = useState<string>("ALL");
+
+  // Local state for optimistic updates during Drag & Drop
+  const [items, setItems] = useState<any[]>(initialQueue);
+
+  const { data: barbers = [] } = useQuery({
+    queryKey: ['barbers'],
+    queryFn: async () => {
+      const { data } = await api.get('/barbers');
+      return data;
+    }
+  });
+
+  const { data: queue = initialQueue, isLoading } = useQuery({
+    queryKey: ['fila'],
+    queryFn: async () => {
+      const { data } = await api.get('/fila');
+      return data;
+    },
+    refetchInterval: 3000, 
+    initialData: initialQueue,
+  });
+
+  // Sync local state when external data arrives, but only if not dragging
   useEffect(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_WHATSAPP_API_URL || "http://localhost:3001";
-    socket = io(wsUrl);
+    setItems(queue);
+  }, [queue]);
 
-    socket.on("connect", () => setSocketConnected(true));
-    socket.on("disconnect", () => setSocketConnected(false));
-    
-    socket.on("queue_updated", () => {
-      window.location.reload();
-    });
+  const { data: config } = useQuery({
+    queryKey: ['fila-config'],
+    queryFn: async () => {
+      const { data } = await api.get('/config/queue');
+      return data;
+    },
+    refetchInterval: 10000,
+  });
 
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+  const addMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post('/fila', { customerId: id });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+      setCustomerId("");
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error || "Erro ao adicionar à fila.");
+    }
+  });
 
-  async function handleAdd(e: React.FormEvent) {
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string, status: string }) => {
+      const { data } = await api.patch(`/fila/${id}`, { status, barberId: selectedBarberId !== "ALL" ? selectedBarberId : undefined });
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fila'] })
+  });
+
+  const reorderMutation = useMutation({
+    mutationFn: async (newOrder: { id: string, orderIndex: number }[]) => {
+      const { data } = await api.patch('/fila/reorder', { items: newOrder });
+      return data;
+    },
+    // We don't invalidate immediately to avoid jitter, let the next 3s poll do it
+  });
+
+  const updateConfigMutation = useMutation({
+    mutationFn: async (newConfig: any) => {
+      const { data } = await api.patch('/config/queue', newConfig);
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fila-config'] })
+  });
+
+  const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerIdInput) return;
-    setIsSubmitting(true);
+    if (!customerId.trim()) return;
+    addMutation.mutate(customerId);
+  };
+
+  // DND Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
     
-    try {
-      const res = await fetch('/api/fila', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          customerId: customerIdInput,
-          barberId: selectedBarber || undefined
-        })
+    if (over && active.id !== over.id) {
+      setItems((items) => {
+        const oldIndex = items.findIndex((i) => i.id === active.id);
+        const newIndex = items.findIndex((i) => i.id === over.id);
+        
+        const newArray = arrayMove(items, oldIndex, newIndex);
+        
+        // Recalculate orderIndexes
+        const reorderedPayload = newArray.map((item, idx) => ({
+          id: item.id,
+          orderIndex: idx + 1
+        }));
+        
+        // Fire mutation
+        reorderMutation.mutate(reorderedPayload);
+
+        return newArray;
       });
-      if (!res.ok) {
-        const err = await res.json();
-        alert(err.error || "Erro ao adicionar");
-      } else {
-        setCustomerIdInput("");
-        const newQ = await fetch('/api/fila').then(r => r.json());
-        if(newQ.queue) setQueue(newQ.queue);
-      }
-    } finally {
-      setIsSubmitting(false);
     }
-  }
+  };
 
-  async function handleStatusChange(id: string, newStatus: string) {
-    if(newStatus === "COMPLETED" || newStatus === "CANCELLED" || newStatus === "ABSENT") {
-      setQueue(prev => prev.filter(item => item.id !== id));
-    } else {
-      setQueue(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
-    }
-    
-    await fetch(`/api/fila/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus })
-    });
-  }
-
-  async function handleReorder(id: string, direction: 'UP' | 'DOWN') {
-    const res = await fetch('/api/fila/reorder', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, direction })
-    });
-    if(res.ok) {
-      const updated = await res.json();
-      setQueue(updated.queue);
-    }
-  }
-
-  async function togglePause() {
-    const newState = !isPaused;
-    setIsPaused(newState);
-    await fetch('/api/config/queue', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isQueuePaused: newState })
-    });
-  }
+  // Filtragem
+  const filteredItems = items.filter(i => {
+    if (selectedBarberId === "ALL") return true;
+    return i.barberId === selectedBarberId || !i.barberId; 
+    // Mostrar clientes sem barbeiro definido ou do barbeiro
+  });
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+      {/* Alerta de Fila Pausada ou Fechada */}
+      {config?.isQueuePaused && (
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="bg-warning/20 border border-warning/50 text-warning px-4 py-3 rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold">
+            <PauseCircle className="w-5 h-5" /> A Fila Virtual está pausada no momento.
+          </div>
+          <button onClick={() => updateConfigMutation.mutate({ isQueuePaused: false })} className="text-xs px-3 py-1.5 bg-warning text-warning-foreground rounded-lg font-bold">Retomar</button>
+        </motion.div>
+      )}
+
       {/* Header Fila */}
-      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      <div className="glass-panel border border-white/10 rounded-2xl p-4 md:p-6 shadow-xl">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" /> Fila Virtual
+            <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
+              <Users className="w-6 h-6 text-primary" /> Fila Inteligente
             </h2>
-            <div className={`mt-1 flex items-center gap-1.5 text-xs font-medium ${socketConnected ? 'text-success' : 'text-danger'}`}>
-              {socketConnected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-              {socketConnected ? 'Conectado em tempo real' : 'Reconectando...'}
-              
-              <span className="mx-2 text-border">|</span>
-              <button onClick={togglePause} className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isPaused ? 'bg-danger/20 text-danger' : 'bg-success/20 text-success'}`}>
-                {isPaused ? 'Fila Pausada' : 'Fila Aberta'}
-              </button>
+            <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+              <Activity className="w-3.5 h-3.5 animate-pulse" />
+              Sincronizado na Nuvem
             </div>
           </div>
           
-          <form className="flex gap-2 w-full md:w-auto flex-wrap" onSubmit={handleAdd}>
-             <input 
-               type="text" 
-               placeholder="ID do Cliente" 
-               className="flex-1 bg-background border border-border text-foreground rounded-xl px-4 py-2 text-sm outline-none focus:border-primary transition-colors min-w-[120px]" 
-               required 
-               value={customerIdInput}
-               onChange={(e) => setCustomerIdInput(e.target.value)}
-             />
-             <select 
-               className="bg-background border border-border text-foreground rounded-xl px-4 py-2 text-sm outline-none focus:border-primary"
-               value={selectedBarber}
-               onChange={(e) => setSelectedBarber(e.target.value)}
-             >
-               <option value="">Qualquer Barbeiro</option>
-               {barbers.map(b => (
-                 <option key={b.id} value={b.id}>{b.name}</option>
-               ))}
-             </select>
-             <button type="submit" disabled={isSubmitting || isPaused} className="btn-primary px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-medium shadow-glow transition-all active:scale-95 disabled:opacity-50">
-               Adicionar
-             </button>
-          </form>
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full lg:w-auto">
+            {/* Seletor de Barbeiro */}
+            <select 
+              className="bg-slate-900 border border-white/10 text-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-primary"
+              value={selectedBarberId}
+              onChange={(e) => setSelectedBarberId(e.target.value)}
+            >
+              <option value="ALL">Todos os Barbeiros</option>
+              {barbers.map((b: any) => (
+                <option key={b.id} value={b.id}>{b.name} {b.specialty ? `(${b.specialty})` : ''}</option>
+              ))}
+            </select>
+
+            <form onSubmit={handleAdd} className="flex gap-2 flex-1">
+               <div className="relative flex-1">
+                 <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                 <input 
+                   type="text" 
+                   value={customerId}
+                   onChange={(e) => setCustomerId(e.target.value)}
+                   placeholder="ID do Cliente" 
+                   className="w-full bg-slate-900 border border-white/10 text-white rounded-xl pl-9 pr-4 py-2 text-sm outline-none focus:border-primary transition-colors" 
+                 />
+               </div>
+               <button type="submit" disabled={addMutation.isPending} className="btn-primary px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-medium shadow-glow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap">
+                 + Adicionar
+               </button>
+            </form>
+
+            <button 
+              onClick={() => setShowConfig(!showConfig)}
+              className="p-2.5 bg-slate-800 border border-white/10 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition-colors shrink-0"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Fila Items */}
+        {/* Configurações */}
+        <AnimatePresence>
+          {showConfig && config && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }} 
+              animate={{ height: "auto", opacity: 1 }} 
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden mb-6"
+            >
+              <div className="p-4 bg-slate-900/50 border border-white/10 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-200">
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium text-slate-400 text-xs">Horário de Abertura</label>
+                  <input type="time" value={config.queueOpenTime} onChange={(e) => updateConfigMutation.mutate({ queueOpenTime: e.target.value })} className="bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 outline-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium text-slate-400 text-xs">Horário de Fechamento</label>
+                  <input type="time" value={config.queueCloseTime} onChange={(e) => updateConfigMutation.mutate({ queueCloseTime: e.target.value })} className="bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 outline-none" />
+                </div>
+                <div className="flex items-center gap-3 pt-3 md:justify-end">
+                  <span className="font-medium">Pausar Fila:</span>
+                  <button onClick={() => updateConfigMutation.mutate({ isQueuePaused: !config.isQueuePaused })} className={`w-12 h-6 rounded-full p-1 transition-colors ${config.isQueuePaused ? 'bg-warning' : 'bg-slate-700'}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.isQueuePaused ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Fila Items com Drag and Drop */}
         <div className="flex flex-col gap-3">
-          {queue.length === 0 && (
-            <div className="text-center py-10 text-muted-foreground bg-background rounded-xl border border-dashed border-border">
+          {filteredItems.length === 0 && (
+            <div className="text-center py-10 text-slate-400 bg-slate-900/30 rounded-xl border border-dashed border-white/10">
               <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p>A fila está vazia no momento.</p>
             </div>
           )}
           
-          <AnimatePresence>
-            {queue.map((item, index) => (
-              <motion.div 
-                key={item.id} 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex flex-col md:flex-row md:items-center bg-background border border-border rounded-xl p-4 md:p-5 relative overflow-hidden gap-4"
-              >
-                {/* Linha indicadora lateral */}
-                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-l-xl"></div>
-                
-                <div className="flex-1 flex items-center gap-4 pl-2">
-                  <div className="flex flex-col items-center gap-1">
-                    <button onClick={() => handleReorder(item.id, 'UP')} className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-30" disabled={index === 0}>
-                      <ArrowUp className="w-4 h-4" />
-                    </button>
-                    <div className="text-2xl font-black text-primary/40 w-8 text-center leading-none">
-                      {index + 1}
-                    </div>
-                    <button onClick={() => handleReorder(item.id, 'DOWN')} className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-30" disabled={index === queue.length - 1}>
-                      <ArrowDown className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  <div className="flex-1">
-                    <strong className="text-lg font-bold block text-foreground">
-                      {item.customer?.name || "Cliente " + item.customerId}
-                    </strong>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                        <Clock className="w-3.5 h-3.5" /> 
-                        Espera est.: {item.estimatedWaitMins} min
-                      </div>
-                      {item.barber && (
-                        <div className="flex items-center gap-1.5 text-xs text-primary/80 font-medium bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                          <UserIcon className="w-3 h-3" />
-                          {item.barber.name}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <select 
-                    className="bg-card border border-border text-foreground text-xs font-semibold uppercase tracking-wider rounded-lg px-3 py-2 outline-none focus:border-primary"
-                    value={item.status}
-                    onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                  >
-                    <option value="WAITING">Aguardando</option>
-                    <option value="CONFIRMED">Confirmado</option>
-                    <option value="COMMUTING">A Caminho</option>
-                    <option value="NEXT">Próximo</option>
-                    <option value="IN_PROGRESS">Em Atendimento</option>
-                    <option value="COMPLETED">Finalizado</option>
-                    <option value="ABSENT">Ausente</option>
-                    <option value="CANCELLED">Cancelado</option>
-                  </select>
-                  
-                  <button 
-                    onClick={() => handleStatusChange(item.id, "COMPLETED")} 
-                    className="flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover p-2 rounded-lg active:scale-95 transition-transform"
-                  >
-                    <CheckCircle2 className="w-4 h-4" /> 
-                    <span>Finalizar</span>
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={filteredItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+              <AnimatePresence>
+                {filteredItems.map((item: any, index: number) => (
+                  <SortableQueueItem 
+                    key={item.id} 
+                    item={item} 
+                    index={index} 
+                    onStatusChange={(id, status) => updateStatusMutation.mutate({ id, status })}
+                    onCheckout={(checkoutItem) => setCheckoutData({
+                      isOpen: true,
+                      customerId: checkoutItem.customerId,
+                      customerName: checkoutItem.customer?.name || "Cliente " + checkoutItem.customerId,
+                      queueItemId: checkoutItem.id
+                    })}
+                  />
+                ))}
+              </AnimatePresence>
+            </SortableContext>
+          </DndContext>
         </div>
       </div>
+
+      {checkoutData && (
+        <PixCheckoutModal 
+          isOpen={checkoutData.isOpen}
+          onClose={() => setCheckoutData(null)}
+          customerId={checkoutData.customerId}
+          customerName={checkoutData.customerName}
+          queueItemId={checkoutData.queueItemId}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['fila'] });
+          }}
+        />
+      )}
     </div>
   );
 }

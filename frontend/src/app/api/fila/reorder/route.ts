@@ -1,33 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items } = body; 
-    // items deve ser um array de { id: string, orderIndex: number, barberId?: string }
+    const { items } = body;
 
     if (!Array.isArray(items)) {
-      return NextResponse.json({ error: "O payload deve conter um array 'items'." }, { status: 400 });
+      return NextResponse.json({ error: "Formato inválido" }, { status: 400 });
     }
 
-    // Executar update em lote (transação)
-    const updates = items.map((item) => {
-      let dataToUpdate: any = { orderIndex: item.orderIndex };
-      if (item.barberId !== undefined) {
-        dataToUpdate.barberId = item.barberId;
-      }
-      return prisma.queueManager.update({
-        where: { id: item.id },
-        data: dataToUpdate
-      });
-    });
+    // Executar as atualizações em uma única transação garantindo integridade
+    await prisma.$transaction(
+      items.map((item: { id: string; orderIndex: number }) =>
+        prisma.queueManager.update({
+          where: { id: item.id },
+          data: { orderIndex: item.orderIndex }
+        })
+      )
+    );
 
-    await prisma.$transaction(updates);
-
-    return NextResponse.json({ success: true, updated: items.length });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao reordenar fila:", error);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

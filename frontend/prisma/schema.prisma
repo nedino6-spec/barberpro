@@ -17,16 +17,6 @@ model Tenant {
   queueOpenTime   String   @default("09:00")
   queueCloseTime  String   @default("18:00")
   isQueuePaused   Boolean  @default(false)
-  isMultiBarber   Boolean  @default(false) // Se a barbearia atende por vários barbeiros
-  
-  // WhatsApp Automations (Templates)
-  msgQueueJoin    String?  @db.Text
-  msgQueueConfirm String?  @db.Text
-  msgQueue3Left   String?  @db.Text
-  msgQueueNext    String?  @db.Text
-  msgQueueStart   String?  @db.Text
-  msgQueueFinish  String?  @db.Text
-  msgQueueAbsent  String?  @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -47,6 +37,7 @@ model Tenant {
   subscriptionPlans SubscriptionPlan[]
   customerSubscriptions CustomerSubscription[]
   whatsAppSessions  WhatsAppSession[]
+  whatsAppTemplates WhatsAppTemplate[]
   googleIntegrations GoogleIntegration[]
   blockedDates      BlockedDate[]
 }
@@ -62,7 +53,6 @@ model User {
   specialty String?  // Especialidade (ex: Fade, Barba)
   startTime String?  // Horário início (ex: "09:00")
   endTime   String?  // Horário fim (ex: "18:00")
-  averageServiceTimeMins Int @default(30) // Tempo médio de atendimento para a IA da fila
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -242,11 +232,10 @@ model CustomerFinance {
 
 model QueueManager {
   id             String    @id @default(uuid())
-  position       Int       @default(0) // Posição lógica na tela
-  orderIndex     Int       @default(0) // Posição real para ordenação/drag-drop
-  status         String    @default("WAITING") // WAITING, CONFIRMED, COMMUTING, NEXT, IN_PROGRESS, COMPLETED, CANCELLED, ABSENT
+  position       Int       @default(0) // Obsoleto, manter para retrocompatibilidade
+  orderIndex     Int       @default(0) // Nova ordem exata na fila para drag&drop
+  status         String    @default("WAITING") // WAITING, CONFIRMED, IN_TRANSIT, NEXT, IN_PROGRESS, COMPLETED, CANCELLED, ABSENT
   estimatedWaitMins Int    @default(0)
-  joinedAt       DateTime  @default(now()) // Hora que entrou na fila
   
   customerId     String    @unique
   customer       Customer  @relation(fields: [customerId], references: [id])
@@ -254,6 +243,10 @@ model QueueManager {
   barberId       String?
   barber         User?     @relation("BarberQueue", fields: [barberId], references: [id])
   
+  joinedAt       DateTime  @default(now())
+  startedAt      DateTime? // Quando o atendimento começou
+  completedAt    DateTime? // Quando finalizou (para calcular TMA)
+
   tenantId String?
   tenant Tenant? @relation(fields: [tenantId], references: [id])
   
@@ -380,4 +373,19 @@ model BlockedDate {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model WhatsAppTemplate {
+  id        String   @id @default(uuid())
+  type      String   // Ex: ENTRY, NEXT, COMPLETED, ABSENT, CONFIRMED
+  message   String   @db.Text
+  isActive  Boolean  @default(true)
+  
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([tenantId, type]) // Cada Tenant tem um template de cada tipo
 }
