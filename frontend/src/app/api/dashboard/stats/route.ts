@@ -14,7 +14,11 @@ export async function GET() {
       customersCount,
       appointmentsCount,
       activeSubscriptionsCount,
-      financeRecords
+      financeRecords,
+      financeTodayRecords,
+      queueActive,
+      queueCancelledToday,
+      queueAbsentToday
     ] = await Promise.all([
       prisma.customer.count(),
       prisma.appointment.count({ where: { date: { gte: today } } }),
@@ -22,6 +26,18 @@ export async function GET() {
       prisma.finance.findMany({
         where: { date: { gte: sevenDaysAgo }, type: "INCOME" },
         orderBy: { date: 'asc' }
+      }),
+      prisma.finance.findMany({
+        where: { date: { gte: today }, type: "INCOME" }
+      }),
+      prisma.queueManager.count({
+        where: { status: { in: ["WAITING", "CONFIRMED", "COMMUTING", "NEXT", "IN_PROGRESS"] } }
+      }),
+      prisma.queueManager.count({
+        where: { status: "CANCELLED", updatedAt: { gte: today } }
+      }),
+      prisma.queueManager.count({
+        where: { status: "ABSENT", updatedAt: { gte: today } }
       })
     ]);
 
@@ -47,11 +63,20 @@ export async function GET() {
       revenue: revenueByDay[date]
     }));
 
+    let totalRevenueToday = 0;
+    financeTodayRecords.forEach(r => totalRevenueToday += r.amount);
+
     return NextResponse.json({
       totalCustomers: customersCount,
       todayAppointments: appointmentsCount,
       activeSubscriptions: activeSubscriptionsCount,
       totalRevenue7Days,
+      totalRevenueToday,
+      queueActive,
+      queueCancelledToday,
+      queueAbsentToday,
+      avgWaitTime: 30, // Default for now
+      fastestBarber: "Geral", // Placeholder
       chartData
     });
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
-import { Users, TrendingUp, Calendar as CalendarIcon, Crown } from "lucide-react";
+import { Users, TrendingUp, Calendar as CalendarIcon, Crown, Clock, XCircle, UserX, Activity } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -58,7 +58,7 @@ export default function DashboardPage() {
               <CalendarIcon className="w-6 h-6 text-blue-400" />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Agendamentos Hoje</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Agendamentos / Atendimentos (Hoje)</p>
             </div>
           </div>
           <p className="text-3xl font-black text-white glow-text relative z-10">{stats?.todayAppointments || 0}</p>
@@ -88,6 +88,54 @@ export default function DashboardPage() {
             </div>
           </div>
           <p className="text-3xl font-black text-white glow-text relative z-10">{stats?.totalCustomers || 0}</p>
+        </div>
+
+      </div>
+
+      {/* Métricas Fila Inteligente (Novas) */}
+      <h2 className="text-xl font-bold text-white flex items-center gap-2 drop-shadow-md">
+        <Activity className="w-5 h-5 text-primary" /> Fila Virtual
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        <div className="glass-card relative overflow-hidden group hover:border-amber-500/30">
+          <div className="flex items-center gap-4 mb-4 relative z-10">
+            <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+              <Users className="w-6 h-6 text-amber-400" />
+            </div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pessoas na Fila</p></div>
+          </div>
+          <p className="text-3xl font-black text-white relative z-10">{stats?.queueActive || 0}</p>
+        </div>
+
+        <div className="glass-card relative overflow-hidden group hover:border-primary/30">
+          <div className="flex items-center gap-4 mb-4 relative z-10">
+            <div className="bg-primary/10 p-3 rounded-xl border border-primary/20">
+              <Clock className="w-6 h-6 text-primary" />
+            </div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tempo Médio</p></div>
+          </div>
+          <p className="text-3xl font-black text-white relative z-10">~{stats?.avgWaitTime || 30}m</p>
+        </div>
+
+        <div className="glass-card relative overflow-hidden group hover:border-rose-500/30">
+          <div className="flex items-center gap-4 mb-4 relative z-10">
+            <div className="bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
+              <XCircle className="w-6 h-6 text-rose-400" />
+            </div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cancelamentos (Hoje)</p></div>
+          </div>
+          <p className="text-3xl font-black text-white relative z-10">{stats?.queueCancelledToday || 0}</p>
+        </div>
+
+        <div className="glass-card relative overflow-hidden group hover:border-orange-500/30">
+          <div className="flex items-center gap-4 mb-4 relative z-10">
+            <div className="bg-orange-500/10 p-3 rounded-xl border border-orange-500/20">
+              <UserX className="w-6 h-6 text-orange-400" />
+            </div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ausentes (Hoje)</p></div>
+          </div>
+          <p className="text-3xl font-black text-white relative z-10">{stats?.queueAbsentToday || 0}</p>
         </div>
 
       </div>

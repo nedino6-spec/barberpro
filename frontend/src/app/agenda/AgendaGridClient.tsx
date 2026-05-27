@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Sparkles, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Sparkles, Clock, Lock, Unlock, AlertTriangle } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
 import { initSocketClient } from "@/lib/socket";
 import AppointmentModal from "@/components/AppointmentModal";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, getDay, isSameMonth } from "date-fns";
+import { ptBR } from "date-fns/locale/pt-BR";
 
 // Gera os blocos de horário uma única vez para performance
 const TIME_SLOTS = (() => {
@@ -22,25 +24,47 @@ const TIME_SLOTS = (() => {
 
 export default function AgendaGridClient({ barbers, customers, services }: any) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [blockReason, setBlockReason] = useState("");
   const queryClient = useQueryClient();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ time: string, barberId: string } | null>(null);
-  const [viewApt, setViewApt] = useState<any>(null); // For viewing an existing appointment
+  const [viewApt, setViewApt] = useState<any>(null);
 
-  const dateStr = currentDate.toISOString().split('T')[0];
+  // Zera as horas para evitar bugs de fuso horário
+  const dateStr = format(currentDate, 'yyyy-MM-dd');
   
-  // Cache de Agendamentos (React Query) com Fallback Rápido
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments', dateStr],
     queryFn: async () => {
       const { data } = await api.get(`/appointments?date=${dateStr}`);
       return data;
     },
-    refetchInterval: 5000, // Atualiza a cada 5s caso o WebSocket falhe
+    refetchInterval: 5000,
   });
 
-  // Busca Inteligência Artificial para Sugestão de Horários (1º Barbeiro como padrão)
+  const { data: blockedDates = [], refetch: refetchBlocked } = useQuery({
+    queryKey: ['blocked-dates'],
+    queryFn: async () => {
+      const { data } = await api.get(`/blocked-dates`);
+      return data || [];
+    }
+  });
+
+  const { data: holidays = [] } = useQuery({
+    queryKey: ['holidays', currentDate.getFullYear()],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`https://brasilapi.com.br/api/feriados/v1/${currentDate.getFullYear()}`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch (e) {
+        return [];
+      }
+    }
+  });
+
   const defaultBarberId = barbers[0]?.id;
   const { data: aiData } = useQuery({
     queryKey: ['ai-suggestion', dateStr, defaultBarberId],
@@ -52,26 +76,45 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
     enabled: !!defaultBarberId && !isLoading && appointments.length > 0,
   });
 
-  // WebSockets para sincronização Instantânea
   useEffect(() => {
     const socket = initSocketClient("default_tenant");
     const onNewAppointment = (payload: any) => {
-      // Injeta no cache nativamente (Atualização Instantânea = 0ms)
       if (payload?.appointment) {
         const aptDate = new Date(payload.appointment.date).toISOString().split('T')[0];
         queryClient.setQueryData(['appointments', aptDate], (old: any) => {
           if (!old) return [payload.appointment];
-          // Evita duplicidade se já existir
           if (old.some((apt: any) => apt.id === payload.appointment.id)) return old;
           return [...old, payload.appointment];
         });
       }
-      // Invalida em background por segurança
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
     };
     socket.on("NOVO_AGENDAMENTO", onNewAppointment);
     return () => { socket.off("NOVO_AGENDAMENTO", onNewAppointment); };
   }, [queryClient]);
+
+  const changeDate = (days: number) => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + days);
+    setCurrentDate(d);
+  };
+
+  const isCurrentBlocked = blockedDates.find((b: any) => b.date === dateStr);
+  const isCurrentHoliday = holidays.find((h: any) => h.date === dateStr);
+
+  const toggleBlockDay = async () => {
+    if (isCurrentBlocked) {
+      await api.delete(`/blocked-dates?date=${dateStr}`);
+    } else {
+      await api.post(`/blocked-dates`, { 
+        date: dateStr, 
+        reason: blockReason || (isCurrentHoliday ? isCurrentHoliday.name : "Bloqueado pelo Administrador"),
+        isHoliday: !!isCurrentHoliday
+      });
+      setBlockReason("");
+    }
+    refetchBlocked();
+  };
 
   // Memoização para evitar re-render pesado da Grid
   const gridContent = useMemo(() => {
@@ -136,79 +179,152 @@ export default function AgendaGridClient({ barbers, customers, services }: any) 
     ));
   }, [appointments, barbers]);
 
-  const changeDate = (days: number) => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + days);
-    setCurrentDate(d);
-  };
+  // Funções do Calendário Mensal
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const startDayOfWeek = getDay(monthStart);
 
-  const formattedDate = currentDate.toLocaleDateString("pt-BR", { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
+  const formattedDate = format(currentDate, "EEEE, d 'de' MMMM", { locale: ptBR }).toUpperCase();
 
   return (
     <div className="glass-panel border border-white/10 rounded-2xl shadow-xl overflow-hidden flex flex-col h-[calc(100vh-140px)]">
       {/* Header */}
-      <div className="p-4 md:p-6 border-b border-white/10 bg-slate-900/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-primary/20 text-primary rounded-xl">
-            <CalendarIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Agenda Inteligente</h1>
-            <p className="text-muted-foreground text-sm flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Sincronizado ao Vivo
-            </p>
+      <div className="p-4 md:p-6 border-b border-white/10 bg-slate-900/40 flex flex-col md:flex-row md:items-center justify-between gap-4 relative">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary/20 text-primary rounded-xl cursor-pointer hover:bg-primary/30 transition" onClick={() => setShowCalendar(!showCalendar)}>
+              <CalendarIcon className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+                Agenda {isCurrentHoliday && <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/50 px-2 py-0.5 rounded-full">{isCurrentHoliday.name}</span>}
+              </h1>
+              <p className="text-muted-foreground text-sm flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Sincronizado ao Vivo
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 glass-panel p-1.5 rounded-xl border border-white/10">
           <button onClick={() => changeDate(-1)} className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-          <div className="relative flex items-center justify-center min-w-[150px]">
-            <input 
-              type="date" 
-              value={dateStr}
-              onChange={(e) => setCurrentDate(new Date(e.target.value + "T12:00:00"))}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <div className="font-bold text-center text-sm md:text-base text-white">{formattedDate}</div>
+          
+          <div className="relative flex flex-col items-center justify-center min-w-[200px] cursor-pointer" onClick={() => setShowCalendar(!showCalendar)}>
+            <div className="font-bold text-center text-sm md:text-base text-white hover:text-primary transition">{formattedDate}</div>
           </div>
+          
           <button onClick={() => changeDate(1)} className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><ChevronRight className="w-5 h-5" /></button>
         </div>
+
+        <AnimatePresence>
+          {showCalendar && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute top-full left-0 md:left-auto md:right-4 mt-2 p-4 glass-panel bg-slate-900/95 border border-white/20 rounded-2xl shadow-2xl z-50 w-[320px]"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1 hover:bg-white/10 rounded"><ChevronLeft className="w-4 h-4"/></button>
+                <span className="font-bold capitalize">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</span>
+                <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1 hover:bg-white/10 rounded"><ChevronRight className="w-4 h-4"/></button>
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2">
+                {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => <div key={i}>{d}</div>)}
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: startDayOfWeek }).map((_, i) => <div key={`empty-${i}`} />)}
+                {monthDays.map(day => {
+                  const dStr = format(day, 'yyyy-MM-dd');
+                  const isHol = holidays.some((h: any) => h.date === dStr);
+                  const isBlk = blockedDates.some((b: any) => b.date === dStr);
+                  const isSelected = isSameDay(day, currentDate);
+                  const isTdy = isToday(day);
+
+                  let btnClass = "h-8 w-8 rounded-full flex items-center justify-center text-sm transition-all hover:bg-white/10";
+                  if (isSelected) btnClass += " bg-primary text-white font-bold shadow-glow";
+                  else if (isTdy) btnClass += " border border-primary/50 text-primary font-bold";
+                  else if (isBlk) btnClass += " opacity-50 bg-rose-500/10 text-rose-400 line-through";
+                  else if (isHol) btnClass += " text-purple-400 font-bold";
+                  else btnClass += " text-slate-200";
+
+                  return (
+                    <button 
+                      key={day.toString()} 
+                      onClick={() => { setCurrentDate(day); setShowCalendar(false); }}
+                      className={btnClass}
+                      title={isHol ? holidays.find((h:any)=>h.date===dStr)?.name : ''}
+                    >
+                      {format(day, 'd')}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {aiData?.suggestion && (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-primary/10 border-b border-primary/20 px-6 py-3 flex items-center justify-between text-sm text-primary font-medium">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 animate-pulse" />
-            Sugestão da IA para {barbers[0]?.name}: {aiData.suggestion} é o horário com maior probabilidade de ser preenchido.
-          </div>
-          <button 
-            onClick={() => { setSelectedSlot({ time: aiData.suggestion, barberId: defaultBarberId }); setIsModalOpen(true); }}
-            className="px-3 py-1 bg-primary text-white rounded shadow-glow text-xs"
-          >
-            Auto Encaixe
-          </button>
-        </motion.div>
-      )}
+      <div className="bg-bg-secondary border-b border-border p-3 flex items-center justify-between">
+        <div className="flex gap-4 text-xs font-medium">
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500/40 border border-blue-500/50"></span> Agendado</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500/40 border border-emerald-500/50"></span> Concluído</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-500/40 border border-purple-500/50"></span> Feriado</div>
+        </div>
+        
+        <button 
+          onClick={toggleBlockDay}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all ${
+            isCurrentBlocked 
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30' 
+              : 'bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30'
+          }`}
+        >
+          {isCurrentBlocked ? <><Unlock className="w-4 h-4"/> Desbloquear Dia</> : <><Lock className="w-4 h-4"/> Bloquear Dia</>}
+        </button>
+      </div>
 
-      {/* Grid */}
+      {/* Grid or Blocked Message */}
       <div className="flex-1 overflow-auto relative custom-scrollbar">
-        {isLoading && (
+        {isLoading && !isCurrentBlocked && (
           <div className="absolute inset-0 z-50 bg-background/50 backdrop-blur-sm flex items-center justify-center">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
 
-        <div className="min-w-[800px] flex">
-          <div className="w-24 flex-shrink-0 border-r border-border bg-bg-tertiary sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
-            <div className="h-16 border-b border-border"></div>
-            {TIME_SLOTS.map((time) => (
-              <div key={time} className="h-20 border-b border-border/50 flex flex-col items-center justify-start py-2 text-xs font-medium text-muted-foreground">
-                {time}
+        {isCurrentBlocked ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-950/20">
+            <div className="p-6 rounded-3xl bg-rose-900/10 border border-rose-500/20 flex flex-col items-center text-center max-w-md backdrop-blur-md">
+              <div className="w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+                <AlertTriangle className="w-8 h-8 text-rose-400" />
               </div>
-            ))}
+              <h2 className="text-2xl font-bold text-white mb-2">Dia Bloqueado</h2>
+              <p className="text-slate-300 mb-6">{isCurrentBlocked.reason || "Nenhum agendamento permitido para esta data."}</p>
+              
+              <button 
+                onClick={toggleBlockDay}
+                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(244,63,94,0.4)] transition"
+              >
+                Desbloquear e Abrir Agenda
+              </button>
+            </div>
           </div>
-          {gridContent}
-        </div>
+        ) : (
+          <div className="min-w-[800px] flex">
+            <div className="w-24 flex-shrink-0 border-r border-border bg-bg-tertiary sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+              <div className="h-16 border-b border-border"></div>
+              {TIME_SLOTS.map((time) => (
+                <div key={time} className="h-20 border-b border-border/50 flex flex-col items-center justify-start py-2 text-xs font-medium text-muted-foreground">
+                  {time}
+                </div>
+              ))}
+            </div>
+            {gridContent}
+          </div>
+        )}
       </div>
 
       <AppointmentModal 

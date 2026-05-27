@@ -1,48 +1,39 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    let tenant = await prisma.tenant.findFirst();
+    const tenant = await prisma.tenant.findFirst();
     if (!tenant) {
-      // Create a default tenant if it doesn't exist
-      tenant = await prisma.tenant.create({
-        data: {
-          name: "Barbearia Principal",
-          queueOpenTime: "09:00",
-          queueCloseTime: "18:00",
-          isQueuePaused: false
-        }
-      });
+      return NextResponse.json({ error: "Tenant não encontrado" }, { status: 404 });
     }
-
     return NextResponse.json({
       queueOpenTime: tenant.queueOpenTime,
       queueCloseTime: tenant.queueCloseTime,
       isQueuePaused: tenant.isQueuePaused
     });
   } catch (error) {
-    return NextResponse.json({ error: "Erro ao buscar config" }, { status: 500 });
+    console.error(error);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
 
-export async function PUT(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
-    const data = await request.json();
-    let tenant = await prisma.tenant.findFirst();
-    
+    const body = await request.json();
+    const { queueOpenTime, queueCloseTime, isQueuePaused } = body;
+
+    const tenant = await prisma.tenant.findFirst();
     if (!tenant) {
-      tenant = await prisma.tenant.create({
-        data: { name: "Barbearia Principal" }
-      });
+      return NextResponse.json({ error: "Tenant não encontrado" }, { status: 404 });
     }
 
     const updated = await prisma.tenant.update({
       where: { id: tenant.id },
       data: {
-        queueOpenTime: data.queueOpenTime !== undefined ? data.queueOpenTime : tenant.queueOpenTime,
-        queueCloseTime: data.queueCloseTime !== undefined ? data.queueCloseTime : tenant.queueCloseTime,
-        isQueuePaused: data.isQueuePaused !== undefined ? data.isQueuePaused : tenant.isQueuePaused,
+        ...(queueOpenTime !== undefined && { queueOpenTime }),
+        ...(queueCloseTime !== undefined && { queueCloseTime }),
+        ...(isQueuePaused !== undefined && { isQueuePaused })
       }
     });
 
@@ -52,6 +43,7 @@ export async function PUT(request: Request) {
       isQueuePaused: updated.isQueuePaused
     });
   } catch (error) {
-    return NextResponse.json({ error: "Erro ao atualizar config" }, { status: 500 });
+    console.error(error);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

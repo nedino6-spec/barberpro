@@ -9,18 +9,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#0f172a",
-        foreground: "#f8fafc",
-        card: "#1e293b",
-        border: "rgba(255,255,255,0.1)",
+        background: "#050505",
+        foreground: "#fcfcfc",
+        card: "#111111",
+        border: "rgba(255,215,0,0.1)", // Gold subtle border
         primary: {
-          DEFAULT: "#3b82f6",
-          hover: "#2563eb",
-          light: "rgba(59, 130, 246, 0.15)",
+          DEFAULT: "#d4af37", // Premium Gold
+          hover: "#eab308", // Lighter Gold on hover
+          light: "rgba(212, 175, 55, 0.15)",
         },
         muted: {
-          DEFAULT: "#64748b",
-          foreground: "#94a3b8",
+          DEFAULT: "#3f3f46",
+          foreground: "#a1a1aa",
         },
         success: "#10b981",
         warning: "#f59e0b",
@@ -31,7 +31,7 @@ const config: Config = {
         "3xl": "1.5rem",
       },
       boxShadow: {
-        glow: "0 0 15px rgba(59, 130, 246, 0.3)",
+        glow: "0 0 20px rgba(212, 175, 55, 0.4)",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
