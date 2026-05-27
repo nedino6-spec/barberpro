@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DollarSign, ArrowUpRight, ArrowDownRight, Download, Plus, Filter, Wallet, Lock, Unlock } from "lucide-react";
+import { DollarSign, ArrowUpRight, ArrowDownRight, Plus, Filter, Wallet, Lock, Unlock, TrendingUp } from "lucide-react";
 import { NovaMovimentacaoModal } from "@/components/financeiro/NovaMovimentacaoModal";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
+
 
 export default function FinanceiroPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -137,6 +139,32 @@ export default function FinanceiroPage() {
         </div>
       </div>
 
+      {/* ── Gráfico Receitas x Despesas ── */}
+      {dashboard?.monthlyTrend && dashboard.monthlyTrend.length > 0 && (
+        <div className="glass-panel border border-white/10 rounded-2xl p-5">
+          <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" /> Receitas x Despesas — Últimos 30 dias
+          </h3>
+          <p className="text-xs text-slate-500 mb-4">Comparativo diário de entradas e saídas</p>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dashboard.monthlyTrend} barSize={10}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="day" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} />
+                <Tooltip
+                  formatter={(v: any, name: string) => [`R$ ${Number(v).toFixed(2)}`, name === 'receitas' ? 'Entradas' : 'Saídas']}
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '11px' }}
+                />
+                <Legend formatter={(v) => v === 'receitas' ? 'Entradas' : 'Saídas'} wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
+                <Bar dataKey="receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       <div className="glass-panel rounded-2xl p-4 md:p-6 shadow-xl">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-bold text-white">Histórico Recente</h2>
@@ -144,6 +172,7 @@ export default function FinanceiroPage() {
             <Filter className="w-4 h-4" /> Filtros
           </button>
         </div>
+
         
         {loading ? (
           <div className="text-center py-8 text-slate-500 animate-pulse">Carregando dados financeiros...</div>
