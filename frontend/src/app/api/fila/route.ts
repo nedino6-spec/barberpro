@@ -71,18 +71,19 @@ export async function POST(request: NextRequest) {
     const nextOrderIndex = lastItem ? lastItem.orderIndex + 1 : 1;
 
     // Tempo estimado inteligente
-    const avgServiceTime = 30; // 30 min por cliente padrão, idealmente virá do Barber
-    const estimatedWaitMins = peopleAhead * avgServiceTime;
+    const { calculateEstimatedWaitTime } = await import("@/lib/ai/queue-prediction");
+    const estimatedWaitMins = await calculateEstimatedWaitTime(body.barberId);
 
     const newItem = await prisma.queueManager.create({
       data: {
         customerId,
+        barberId: body.barberId || null,
         position: peopleAhead + 1,
         orderIndex: nextOrderIndex,
         estimatedWaitMins,
         status: "WAITING"
       },
-      include: { customer: true }
+      include: { customer: true, barber: true }
     });
 
     // Tentar notificar webhook (Bot do WhatsApp) - Opcional e Assíncrono
