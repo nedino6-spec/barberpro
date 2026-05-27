@@ -7,10 +7,18 @@ export async function GET() {
     if (!tenant) {
       return NextResponse.json({ error: "Tenant não encontrado" }, { status: 404 });
     }
+    
+    // Conta pessoas na fila agora
+    const currentQueueSize = await prisma.queueManager.count({
+      where: { status: { in: ["WAITING", "CONFIRMED", "IN_TRANSIT", "NEXT", "IN_PROGRESS"] } }
+    });
+
     return NextResponse.json({
       queueOpenTime: tenant.queueOpenTime,
       queueCloseTime: tenant.queueCloseTime,
-      isQueuePaused: tenant.isQueuePaused
+      isQueuePaused: tenant.isQueuePaused,
+      queueMaxSize: tenant.queueMaxSize,
+      currentQueueSize,
     });
   } catch (error) {
     console.error(error);
@@ -21,7 +29,7 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { queueOpenTime, queueCloseTime, isQueuePaused } = body;
+    const { queueOpenTime, queueCloseTime, isQueuePaused, queueMaxSize } = body;
 
     const tenant = await prisma.tenant.findFirst();
     if (!tenant) {
@@ -33,14 +41,16 @@ export async function PATCH(request: NextRequest) {
       data: {
         ...(queueOpenTime !== undefined && { queueOpenTime }),
         ...(queueCloseTime !== undefined && { queueCloseTime }),
-        ...(isQueuePaused !== undefined && { isQueuePaused })
+        ...(isQueuePaused !== undefined && { isQueuePaused }),
+        ...(queueMaxSize !== undefined && { queueMaxSize: parseInt(queueMaxSize) }),
       }
     });
 
     return NextResponse.json({
       queueOpenTime: updated.queueOpenTime,
       queueCloseTime: updated.queueCloseTime,
-      isQueuePaused: updated.isQueuePaused
+      isQueuePaused: updated.isQueuePaused,
+      queueMaxSize: updated.queueMaxSize,
     });
   } catch (error) {
     console.error(error);

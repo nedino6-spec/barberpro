@@ -17,6 +17,7 @@ model Tenant {
   queueOpenTime   String   @default("09:00")
   queueCloseTime  String   @default("18:00")
   isQueuePaused   Boolean  @default(false)
+  queueMaxSize    Int      @default(30) // Limite máximo de pessoas na fila
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -78,6 +79,7 @@ model Customer {
   lastVisit     DateTime?
   notes         String?
   isBlocked     Boolean   @default(false)
+  absentCount   Int       @default(0) // Contador de faltas para auto-bloqueio
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -107,6 +109,7 @@ model Service {
   tenant Tenant? @relation(fields: [tenantId], references: [id])
 
   appointments    Appointment[]
+  queueItems      QueueManager[]
 }
 
 model Appointment {
@@ -236,12 +239,17 @@ model QueueManager {
   orderIndex     Int       @default(0) // Nova ordem exata na fila para drag&drop
   status         String    @default("WAITING") // WAITING, CONFIRMED, IN_TRANSIT, NEXT, IN_PROGRESS, COMPLETED, CANCELLED, ABSENT
   estimatedWaitMins Int    @default(0)
+  rating         Int?      // Avaliação do cliente (1-5 estrelas)
+  ratingComment  String?   // Comentário da avaliação
   
   customerId     String    @unique
   customer       Customer  @relation(fields: [customerId], references: [id])
   
   barberId       String?
   barber         User?     @relation("BarberQueue", fields: [barberId], references: [id])
+
+  serviceId      String?   // Serviço escolhido (para cálculo de tempo por serviço)
+  service        Service?  @relation(fields: [serviceId], references: [id])
   
   joinedAt       DateTime  @default(now())
   startedAt      DateTime? // Quando o atendimento começou

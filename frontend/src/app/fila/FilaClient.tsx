@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Settings, PauseCircle, Activity, Search } from "lucide-react";
+import { Users, Settings, PauseCircle, Activity, Search, BarChart3, Clock, Star } from "lucide-react";
 import { api } from "@/lib/axios";
 import PixCheckoutModal from "@/components/PixCheckoutModal";
 
@@ -29,6 +29,7 @@ import { SortableQueueItem } from "./SortableQueueItem";
 export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] }) {
   const queryClient = useQueryClient();
   const [showConfig, setShowConfig] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [checkoutData, setCheckoutData] = useState<{isOpen: boolean, customerId: string, customerName: string, queueItemId: string} | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -73,6 +74,17 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
       return data;
     },
     refetchInterval: 10000,
+  });
+
+  const { data: history = [] } = useQuery({
+    queryKey: ['fila-history', selectedBarberId],
+    queryFn: async () => {
+      const params = selectedBarberId !== 'ALL' ? `?barberId=${selectedBarberId}` : '';
+      const { data } = await api.get(`/fila/historico${params}`);
+      return data;
+    },
+    enabled: showHistory,
+    refetchInterval: 30000,
   });
 
   const addMutation = useMutation({
@@ -172,15 +184,40 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
 
       {/* Header Fila */}
       <div className="glass-panel border border-white/10 rounded-2xl p-4 md:p-6 shadow-xl">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
           <div>
             <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
               <Users className="w-6 h-6 text-primary" /> Fila Inteligente
             </h2>
-            <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-400">
-              <Activity className="w-3.5 h-3.5 animate-pulse" />
-              Sincronizado na Nuvem
+            <div className="mt-1 flex items-center gap-3 text-xs font-medium">
+              <span className="flex items-center gap-1 text-emerald-400">
+                <Activity className="w-3.5 h-3.5 animate-pulse" /> Ao Vivo
+              </span>
+              {config && (
+                <span className="flex items-center gap-1 text-slate-400">
+                  <Users className="w-3.5 h-3.5" />
+                  {config.currentQueueSize || 0}/{config.queueMaxSize || 30} pessoas
+                </span>
+              )}
+              {config && (
+                <span className="flex items-center gap-1 text-slate-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  {config.queueOpenTime} – {config.queueCloseTime}
+                </span>
+              )}
             </div>
+            {/* Barra de Capacidade */}
+            {config && (
+              <div className="mt-2 w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all ${
+                    (config.currentQueueSize / config.queueMaxSize) > 0.8 ? 'bg-rose-500' :
+                    (config.currentQueueSize / config.queueMaxSize) > 0.5 ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}
+                  style={{ width: `${Math.min(100, ((config.currentQueueSize || 0) / (config.queueMaxSize || 30)) * 100)}%` }}
+                />
+              </div>
+            )}
           </div>
           
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full lg:w-auto">
@@ -213,8 +250,15 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
             </form>
 
             <button 
-              onClick={() => setShowConfig(!showConfig)}
-              className="p-2.5 bg-slate-800 border border-white/10 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition-colors shrink-0"
+              onClick={() => { setShowHistory(!showHistory); setShowConfig(false); }}
+              className={`p-2.5 border border-white/10 rounded-xl transition-colors shrink-0 ${showHistory ? 'bg-primary text-white' : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'}`}
+              title="Histórico do Dia"
+            >
+              <BarChart3 className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={() => { setShowConfig(!showConfig); setShowHistory(false); }}
+              className={`p-2.5 border border-white/10 rounded-xl transition-colors shrink-0 ${showConfig ? 'bg-primary text-white' : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'}`}
             >
               <Settings className="w-5 h-5" />
             </button>
@@ -230,7 +274,7 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden mb-6"
             >
-              <div className="p-4 bg-slate-900/50 border border-white/10 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-200">
+              <div className="p-4 bg-slate-900/50 border border-white/10 rounded-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-slate-200">
                 <div className="flex flex-col gap-1">
                   <label className="font-medium text-slate-400 text-xs">Horário de Abertura</label>
                   <input type="time" value={config.queueOpenTime} onChange={(e) => updateConfigMutation.mutate({ queueOpenTime: e.target.value })} className="bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 outline-none" />
@@ -238,6 +282,19 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
                 <div className="flex flex-col gap-1">
                   <label className="font-medium text-slate-400 text-xs">Horário de Fechamento</label>
                   <input type="time" value={config.queueCloseTime} onChange={(e) => updateConfigMutation.mutate({ queueCloseTime: e.target.value })} className="bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 outline-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium text-slate-400 text-xs">Limite Máximo de Pessoas</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      min="1" max="100"
+                      value={config.queueMaxSize || 30}
+                      onChange={(e) => updateConfigMutation.mutate({ queueMaxSize: e.target.value })} 
+                      className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 outline-none text-white" 
+                    />
+                    <span className="text-xs text-slate-500 whitespace-nowrap">({config.currentQueueSize || 0} agora)</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 pt-3 md:justify-end">
                   <span className="font-medium">Pausar Fila:</span>
@@ -280,6 +337,75 @@ export default function FilaVirtualPage({ initialQueue }: { initialQueue: any[] 
             </SortableContext>
           </DndContext>
         </div>
+      </div>
+
+      {/* Painel de Histórico do Dia */}
+      <AnimatePresence>
+        {showHistory && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="glass-panel border border-white/10 rounded-2xl p-4 md:p-6 shadow-xl"
+          >
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary" /> Histórico de Hoje
+              {history.stats && (
+                <div className="ml-auto flex items-center gap-4 text-sm font-normal">
+                  <span className="text-slate-400"><span className="text-white font-bold">{history.stats?.total}</span> atendimentos</span>
+                  <span className="text-slate-400">TMA: <span className="text-amber-400 font-bold">{history.stats?.averageMins}min</span></span>
+                  {history.stats?.averageRating && (
+                    <span className="flex items-center gap-1 text-slate-400">
+                      <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                      <span className="text-white font-bold">{history.stats.averageRating}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </h3>
+            <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+              {(history.items || []).length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-6">Nenhum atendimento concluído hoje.</p>
+              ) : (
+                (history.items || []).map((item: any) => (
+                  <div key={item.id} className="flex items-center justify-between bg-slate-900/40 rounded-xl p-3 border border-white/5">
+                    <div>
+                      <strong className="text-white text-sm">{item.customer?.name}</strong>
+                      <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+                        {item.barber && <span>✂️ {item.barber.name}</span>}
+                        {item.service && <span>• {item.service.name}</span>}
+                        {item.durationMins > 0 && <span>• <Clock className="w-3 h-3 inline" /> {item.durationMins}min</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.rating && (
+                        <div className="flex items-center gap-0.5">
+                          {[1,2,3,4,5].map(s => (
+                            <Star key={s} className={`w-3 h-3 ${s <= item.rating ? 'text-yellow-400 fill-yellow-400' : 'text-slate-600'}`} />
+                          ))}
+                        </div>
+                      )}
+                      <span className="text-xs text-slate-500">
+                        {item.completedAt ? new Date(item.completedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Info: Link Público */}
+      <div className="glass-panel border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-white">📱 Link Público da Fila</p>
+          <p className="text-xs text-slate-400 mt-0.5">Clientes podem entrar na fila pelo celular via API</p>
+        </div>
+        <code className="text-xs bg-slate-900 text-primary border border-white/10 px-3 py-1.5 rounded-lg">
+          /api/fila/publica
+        </code>
       </div>
 
       {checkoutData && (
