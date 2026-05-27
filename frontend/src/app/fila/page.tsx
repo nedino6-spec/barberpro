@@ -5,9 +5,11 @@ export const revalidate = 0;
 
 export default async function FilaPage() {
   const queue = await prisma.queueManager.findMany({
-    where: { status: "WAITING" },
-    include: { customer: true },
-    orderBy: { createdAt: 'asc' }
+    where: { 
+      status: { in: ["WAITING", "CONFIRMED", "IN_TRANSIT", "NEXT", "IN_PROGRESS"] }
+    },
+    include: { customer: true, barber: true },
+    orderBy: { orderIndex: 'asc' }
   });
 
   return (
